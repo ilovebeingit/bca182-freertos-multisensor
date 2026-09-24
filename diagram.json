@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "author": "BCA182 Student",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-stm32-bluepill", "id": "stm32", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-dht22", "id": "dht", "top": -120, "left": 160, "attrs": {} },
+    { "type": "wokwi-photoresistor-sensor", "id": "ldr", "top": 30, "left": 160, "attrs": {} },
+    { "type": "wokwi-pir-motion-sensor", "id": "pir", "top": 180, "left": 160, "attrs": {} },
+    { "type": "board-ssd1306", "id": "oled", "top": -120, "left": -180, "attrs": {} },
+    { "type": "wokwi-ky-040", "id": "encoder", "top": 30, "left": -180, "attrs": {} },
+    { "type": "wokwi-buzzer", "id": "buzzer", "top": 180, "left": -180, "attrs": {} }
+  ],
+  "connections": [
+    [ "stm32:3V3.1", "dht:VCC", "red", [ "v0" ] ],
+    [ "stm32:GND.1", "dht:GND", "black", [ "v0" ] ],
+    [ "stm32:A0", "dht:SDA", "green", [ "v0" ] ],
+    [ "stm32:3V3.1", "ldr:VCC", "red", [ "v0" ] ],
+    [ "stm32:GND.1", "ldr:GND", "black", [ "v0" ] ],
+    [ "stm32:A1", "ldr:AO", "yellow", [ "v0" ] ],
+    [ "stm32:3V3.1", "pir:VCC", "red", [ "v0" ] ],
+    [ "stm32:GND.1", "pir:GND", "black", [ "v0" ] ],
+    [ "stm32:A2", "pir:OUT", "purple", [ "v0" ] ],
+    [ "stm32:3V3.1", "oled:VCC", "red", [ "v0" ] ],
+    [ "stm32:GND.1", "oled:GND", "black", [ "v0" ] ],
+    [ "stm32:B6", "oled:SCL", "blue", [ "v0" ] ],
+    [ "stm32:B7", "oled:SDA", "orange", [ "v0" ] ],
+    [ "stm32:3V3.1", "encoder:VCC", "red", [ "v0" ] ],
+    [ "stm32:GND.1", "encoder:GND", "black", [ "v0" ] ],
+    [ "stm32:A3", "encoder:CLK", "cyan", [ "v0" ] ],
+    [ "stm32:A4", "encoder:DT", "magenta", [ "v0" ] ],
+    [ "stm32:A5", "encoder:SW", "white", [ "v0" ] ],
+    [ "stm32:GND.1", "buzzer:1", "black", [ "v0" ] ],
+    [ "stm32:A8", "buzzer:2", "red", [ "v0" ] ]
+  ]
+}
