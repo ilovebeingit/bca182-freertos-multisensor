@@ -5,6 +5,7 @@
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "dht22.h"
 #include "rtos_objects.h"
 #include "serial_log.h"
 #include "system_state.h"
@@ -43,15 +44,51 @@ void sensors_init(void) {
     sConfig.Rank = ADC_REGULAR_RANK_1;
     sConfig.SamplingTime = ADC_SAMPLETIME_55CYCLES_5;
     HAL_ADC_ConfigChannel(&hadc1, &sConfig);
+
+    // PA0 DHT22
+    dht22_init();
+}
+
+/* Reads the DHT22 into sensorData and logs the result. On any failure
+ * sensorData keeps its previous temperature/humidity. */
+static void read_dht22(RoomData_t *sensorData) {
+    Dht22Reading reading;
+    char line[48];
+    char value[12];
+
+    Dht22Status status = dht22_read(&reading);
+    if (status != DHT22_OK) {
+        snprintf(line, sizeof(line), "DHT22: read failed (%s)", dht22_status_name(status));
+        log_line(line);
+        return;
+    }
+
+    sensorData->temperature = reading.temperature_tenths / 10.0f;
+    sensorData->humidity = reading.humidity_tenths / 10.0f;
+
+    format_tenths_2dp(value, sizeof(value), reading.temperature_tenths);
+    snprintf(line, sizeof(line), "Temperature: %s C", value);
+    log_line(line);
+
+    format_tenths_2dp(value, sizeof(value), reading.humidity_tenths);
+    snprintf(line, sizeof(line), "Humidity: %s %%", value);
+    log_line(line);
 }
 
 void SensorTask(void *pvParameters) {
     RoomData_t sensorData = {24.5f, 60.0f, 0, 0, 0, 0};
     char line[64];
+    uint32_t last_dht_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
     log_line("SensorTask started");
 
     for (;;) {
+        uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+        if (dht22_read_due(now_ms, last_dht_ms)) {
+            last_dht_ms = now_ms;
+            read_dht22(&sensorData);
+        }
+
         HAL_ADC_Start(&hadc1);
         if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK) {
             sensorData.light_level = (uint16_t)HAL_ADC_GetValue(&hadc1);
