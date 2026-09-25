@@ -161,6 +161,26 @@ uint8_t display_fit_scale(const char *str, uint8_t max_scale) {
     return 1;
 }
 
+DisplayMode nextDisplayMode(DisplayMode mode) {
+    switch (mode) {
+        case DisplayMode::TEMPERATURE: return DisplayMode::HUMIDITY;
+        case DisplayMode::HUMIDITY:    return DisplayMode::LIGHT;
+        case DisplayMode::LIGHT:       return DisplayMode::MOTION;
+        case DisplayMode::MOTION:      return DisplayMode::TEMPERATURE;
+    }
+    return kInitialDisplayMode;
+}
+
+DisplayMode previousDisplayMode(DisplayMode mode) {
+    switch (mode) {
+        case DisplayMode::TEMPERATURE: return DisplayMode::MOTION;
+        case DisplayMode::HUMIDITY:    return DisplayMode::TEMPERATURE;
+        case DisplayMode::LIGHT:       return DisplayMode::HUMIDITY;
+        case DisplayMode::MOTION:      return DisplayMode::LIGHT;
+    }
+    return kInitialDisplayMode;
+}
+
 const char *display_mode_label(DisplayMode mode) {
     switch (mode) {
         case DisplayMode::TEMPERATURE: return "TEMPERATURE";

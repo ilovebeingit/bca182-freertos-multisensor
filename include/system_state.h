@@ -13,8 +13,6 @@ typedef struct {
     bool dht_valid;         /* true only if this sample's DHT22 read succeeded */
 } SensorData_t;
 
-/* Motion and user-input state (not sensor samples): g_motion_flag is written
- * by MotionTask and read by AlarmTask and DisplayTask; g_encoder_count is
- * written by InputTask and read by DisplayTask. */
+/* Motion state (not a sensor sample): written by MotionTask, read by
+ * AlarmTask and DisplayTask. */
 extern volatile uint8_t g_motion_flag;
-extern volatile int32_t g_encoder_count;

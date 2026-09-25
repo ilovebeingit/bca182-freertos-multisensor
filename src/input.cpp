@@ -1,11 +1,16 @@
 #include "input.h"
 
+#include <stdio.h>
+
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "display_logic.h"
 #include "input_logic.h"
+#include "rtos_objects.h"
 #include "serial_log.h"
-#include "system_state.h"
+
+static constexpr uint32_t kInputPeriodMs = 5;
 
 void input_init(void) {
     __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -20,21 +25,32 @@ void input_init(void) {
 }
 
 void InputTask(void *pvParameters) {
+    /* Encoder decoder state and the navigation state live only here. */
     bool prev_clk = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3) == GPIO_PIN_SET;
     bool prev_pressed = false;
+    DisplayMode mode = kInitialDisplayMode;
+    char line[32];
 
     log_line("InputTask started");
 
+    TickType_t last_wake = xTaskGetTickCount();
+
     for (;;) {
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(kInputPeriodMs));
+
         bool clk = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3) == GPIO_PIN_SET;
         bool dt = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_SET;
 
         int8_t step = encoder_step(prev_clk, clk, dt);
-        if (step != 0) {
-            g_encoder_count += step;
-            log_line(step > 0 ? "INPUT: encoder +1" : "INPUT: encoder -1");
-        }
         prev_clk = clk;
+        if (step != 0) {
+            /* +1 is clockwise (next), -1 counterclockwise (previous). */
+            mode = step > 0 ? nextDisplayMode(mode) : previousDisplayMode(mode);
+            xQueueOverwrite(xModeQueue, &mode);
+
+            snprintf(line, sizeof(line), "INPUT: mode %s", display_mode_label(mode));
+            log_line(line);
+        }
 
         bool sw = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_SET;
         bool pressed = button_is_pressed(sw);
@@ -42,7 +58,5 @@ void InputTask(void *pvParameters) {
             log_line("INPUT: button pressed");
         }
         prev_pressed = pressed;
-
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

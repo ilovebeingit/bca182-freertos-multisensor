@@ -17,6 +17,7 @@ extern uint32_t SystemCoreClock;
 #define configUSE_16_BIT_TICKS                  0
 #define configIDLE_SHOULD_YIELD                 1
 #define configUSE_MUTEXES                       1
+#define configUSE_QUEUE_SETS                    1
 #define configSUPPORT_DYNAMIC_ALLOCATION        1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 0
 

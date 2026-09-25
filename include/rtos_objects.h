@@ -10,6 +10,14 @@
 extern QueueHandle_t xDisplayQueue;
 extern QueueHandle_t xAlarmQueue;
 
+/* Latest DisplayMode chosen with the encoder, length 1: InputTask overwrites,
+ * DisplayTask receives. Only the newest mode matters. */
+extern QueueHandle_t xModeQueue;
+
+/* Queue set holding xDisplayQueue and xModeQueue, so DisplayTask can block on
+ * both at once and redraw as soon as either a sample or a mode change arrives. */
+extern QueueSetHandle_t xDisplayEvents;
+
 /* Guards USART1: held by log_line() for one whole line at a time. */
 extern SemaphoreHandle_t serialMutex;
 

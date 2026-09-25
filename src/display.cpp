@@ -97,16 +97,31 @@ void display_init(void) {
 }
 
 void DisplayTask(void *pvParameters) {
-    /* Encoder-driven mode switching arrives in Stage 7. */
-    const DisplayMode mode = DisplayMode::TEMPERATURE;
-    SensorData_t sample;
+    DisplayMode mode = kInitialDisplayMode;
+    SensorData_t sample = {0.0f, 0.0f, 0, false};
+    bool have_sample = false;
 
     log_line("DisplayTask started");
     ssd1306_init();
     log_line("DISPLAY: OLED initialised");
 
     for (;;) {
-        if (xQueueReceive(xDisplayQueue, &sample, portMAX_DELAY) == pdTRUE) {
+        /* Blocks until xDisplayQueue (new sample, every 2 s) or xModeQueue
+         * (encoder turned) has an item, and returns which one. Each set event
+         * corresponds to exactly one queued item, so the 0-timeout receive
+         * below always succeeds. */
+        QueueSetMemberHandle_t ready = xQueueSelectFromSet(xDisplayEvents, portMAX_DELAY);
+
+        if (ready == xDisplayQueue) {
+            if (xQueueReceive(xDisplayQueue, &sample, 0) == pdTRUE) {
+                have_sample = true;
+            }
+        } else if (ready == xModeQueue) {
+            xQueueReceive(xModeQueue, &mode, 0);
+        }
+
+        /* Until the first sample arrives there is nothing real to show. */
+        if (have_sample) {
             display_render_screen(s_frame, mode, &sample, g_motion_flag != 0);
             ssd1306_flush();
         }

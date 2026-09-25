@@ -6,6 +6,7 @@
 /* Sets up I2C1 only; the panel itself is initialised by DisplayTask. */
 void display_init(void);
 
-/* Initialises the panel, then for every sample received from xDisplayQueue
- * (every 2 s) renders the current mode's screen and flushes the frame. */
+/* Initialises the panel, then blocks on xDisplayEvents and redraws the
+ * current mode's screen whenever a new sample (xDisplayQueue, every 2 s) or a
+ * new mode (xModeQueue, from the encoder) arrives. */
 void DisplayTask(void *pvParameters);

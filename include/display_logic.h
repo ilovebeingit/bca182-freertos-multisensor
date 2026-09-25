@@ -29,6 +29,14 @@ enum class DisplayMode : uint8_t {
     MOTION,
 };
 
+/* Mode shown at boot; InputTask and DisplayTask both start from it. */
+constexpr DisplayMode kInitialDisplayMode = DisplayMode::TEMPERATURE;
+
+/* Encoder navigation. Clockwise: TEMPERATURE -> HUMIDITY -> LIGHT -> MOTION
+ * -> TEMPERATURE; counterclockwise is the reverse. Both wrap around. */
+DisplayMode nextDisplayMode(DisplayMode mode);
+DisplayMode previousDisplayMode(DisplayMode mode);
+
 void display_clear(uint8_t *fb);
 void display_set_pixel(uint8_t *fb, int16_t x, int16_t y);
 
