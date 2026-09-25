@@ -4,5 +4,6 @@
 
 void input_init(void);
 
-/* Polls the encoder every 10 ms, updating g_encoder_count and g_button_flag. */
+/* Polls the encoder every 10 ms, updating g_encoder_count and logging
+ * encoder steps and button presses. */
 void InputTask(void *pvParameters);

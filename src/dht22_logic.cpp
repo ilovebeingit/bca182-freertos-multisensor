@@ -33,10 +33,6 @@ Dht22Status dht22_decode(const uint16_t high_us[kDht22Bits], Dht22Reading *out) 
     return DHT22_OK;
 }
 
-bool dht22_read_due(uint32_t now_ms, uint32_t last_read_ms) {
-    return (uint32_t)(now_ms - last_read_ms) >= kDht22MinIntervalMs;
-}
-
 void format_tenths_2dp(char *buf, size_t size, int32_t tenths) {
     const char *sign = tenths < 0 ? "-" : "";
     uint32_t magnitude = (uint32_t)(tenths < 0 ? -tenths : tenths);

@@ -2,11 +2,13 @@
 
 #include "system_state.h"
 
-QueueHandle_t xSensorQueue = NULL;
+QueueHandle_t xDisplayQueue = NULL;
+QueueHandle_t xAlarmQueue = NULL;
 SemaphoreHandle_t serialMutex = NULL;
 
 bool rtos_objects_create(void) {
-    xSensorQueue = xQueueCreate(1, sizeof(RoomData_t));
+    xDisplayQueue = xQueueCreate(1, sizeof(SensorData_t));
+    xAlarmQueue = xQueueCreate(1, sizeof(SensorData_t));
     serialMutex = xSemaphoreCreateMutex();
-    return xSensorQueue != NULL && serialMutex != NULL;
+    return xDisplayQueue != NULL && xAlarmQueue != NULL && serialMutex != NULL;
 }

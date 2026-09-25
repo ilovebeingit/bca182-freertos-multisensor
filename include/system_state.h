@@ -5,16 +5,16 @@
 
 #include <stdint.h>
 
+/* One SensorTask sample, sent by value through xDisplayQueue and xAlarmQueue. */
 typedef struct {
-    float temperature;
-    float humidity;
-    uint16_t light_level;
-    uint8_t motion_detected;
-    int32_t encoder_count;
-    uint8_t button_pressed;
-} RoomData_t;
+    float temperature;      /* degC; meaningful only when dht_valid */
+    float humidity;         /* %RH;  meaningful only when dht_valid */
+    uint16_t light_level;   /* raw 12-bit LDR ADC value */
+    bool dht_valid;         /* true only if this sample's DHT22 read succeeded */
+} SensorData_t;
 
-/* Written by MotionTask / InputTask, read by SensorTask and AlarmTask. */
+/* Motion and user-input state (not sensor samples): g_motion_flag is written
+ * by MotionTask and read by AlarmTask and DisplayTask; g_encoder_count is
+ * written by InputTask and read by DisplayTask. */
 extern volatile uint8_t g_motion_flag;
 extern volatile int32_t g_encoder_count;
-extern volatile uint8_t g_button_flag;

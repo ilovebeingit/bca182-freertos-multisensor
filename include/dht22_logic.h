@@ -34,10 +34,6 @@ bool dht22_bit_from_high_us(uint32_t high_us);
 /* Decodes 40 high-pulse widths (us). Writes *out only when DHT22_OK. */
 Dht22Status dht22_decode(const uint16_t high_us[kDht22Bits], Dht22Reading *out);
 
-/* True when at least kDht22MinIntervalMs has passed since last_read_ms
- * (wrap-safe unsigned arithmetic). */
-bool dht22_read_due(uint32_t now_ms, uint32_t last_read_ms);
-
 /* "23.50", "-0.50": tenths printed with two decimals, no floating point. */
 void format_tenths_2dp(char *buf, size_t size, int32_t tenths);
 

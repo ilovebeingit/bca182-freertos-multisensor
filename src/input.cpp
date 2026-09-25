@@ -38,7 +38,6 @@ void InputTask(void *pvParameters) {
 
         bool sw = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == GPIO_PIN_SET;
         bool pressed = button_is_pressed(sw);
-        g_button_flag = pressed ? 1 : 0;
         if (pressed && !prev_pressed) {
             log_line("INPUT: button pressed");
         }

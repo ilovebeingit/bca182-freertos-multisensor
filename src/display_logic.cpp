@@ -62,19 +62,20 @@ void display_write_string(uint8_t *fb, uint8_t x, uint8_t y, const char *str) {
     }
 }
 
-void display_render_dashboard(uint8_t *fb, const RoomData_t *data) {
+void display_render_dashboard(uint8_t *fb, const SensorData_t *sample,
+                              bool motion_detected, int32_t encoder_count) {
     char lineBuf[24];
 
     display_clear(fb);
 
     display_write_string(fb, 0, 0, "RTOS DASHBOARD");
 
-    snprintf(lineBuf, sizeof(lineBuf), "LIGHT: %u", data->light_level);
+    snprintf(lineBuf, sizeof(lineBuf), "LIGHT: %u", sample->light_level);
     display_write_string(fb, 0, 16, lineBuf);
 
-    snprintf(lineBuf, sizeof(lineBuf), "MOTION: %s", data->motion_detected ? "DETECTED" : "CLEAR");
+    snprintf(lineBuf, sizeof(lineBuf), "MOTION: %s", motion_detected ? "DETECTED" : "CLEAR");
     display_write_string(fb, 0, 32, lineBuf);
 
-    snprintf(lineBuf, sizeof(lineBuf), "ENCODER: %ld", (long)data->encoder_count);
+    snprintf(lineBuf, sizeof(lineBuf), "ENCODER: %ld", (long)encoder_count);
     display_write_string(fb, 0, 48, lineBuf);
 }

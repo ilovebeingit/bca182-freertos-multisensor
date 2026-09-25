@@ -18,5 +18,7 @@ void display_clear(uint8_t *fb);
 void display_draw_char(uint8_t *fb, uint8_t x, uint8_t y, char c);
 void display_write_string(uint8_t *fb, uint8_t x, uint8_t y, const char *str);
 
-/* Clears fb and draws the dashboard for one sensor sample. */
-void display_render_dashboard(uint8_t *fb, const RoomData_t *data);
+/* Clears fb and draws the dashboard: light from the sensor sample, plus the
+ * current motion state and encoder count. */
+void display_render_dashboard(uint8_t *fb, const SensorData_t *sample,
+                              bool motion_detected, int32_t encoder_count);

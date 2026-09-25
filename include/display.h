@@ -6,5 +6,5 @@
 void display_init(void);
 
 /* Initialises the panel, then redraws the dashboard for every sample
- * received from xSensorQueue. */
+ * received from xDisplayQueue (every 2 s). */
 void DisplayTask(void *pvParameters);

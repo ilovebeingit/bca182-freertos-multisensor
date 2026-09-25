@@ -84,15 +84,16 @@ void display_init(void) {
 }
 
 void DisplayTask(void *pvParameters) {
-    RoomData_t rxData;
+    SensorData_t sample;
 
     log_line("DisplayTask started");
     SSD1306_Init();
     log_line("DISPLAY: OLED initialised");
 
     for (;;) {
-        if (xQueueReceive(xSensorQueue, &rxData, portMAX_DELAY) == pdTRUE) {
-            display_render_dashboard(SSD1306_Buffer, &rxData);
+        if (xQueueReceive(xDisplayQueue, &sample, portMAX_DELAY) == pdTRUE) {
+            display_render_dashboard(SSD1306_Buffer, &sample,
+                                     g_motion_flag != 0, g_encoder_count);
             SSD1306_UpdateScreen();
         }
     }

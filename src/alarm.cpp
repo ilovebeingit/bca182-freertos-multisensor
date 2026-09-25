@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "alarm_logic.h"
+#include "rtos_objects.h"
 #include "serial_log.h"
 #include "system_state.h"
 
@@ -21,10 +22,17 @@ void alarm_init(void) {
 
 void AlarmTask(void *pvParameters) {
     bool prev_sounding = false;
+    SensorData_t latest = {0.0f, 0.0f, 0, false};
 
     log_line("AlarmTask started");
 
     for (;;) {
+        /* Take the newest sample if one arrived, without blocking: the buzzer
+         * timing below must not wait on the 2 s sensor period. `latest` is
+         * the input for the threshold/state-machine stage; the buzzer itself
+         * still follows motion only. */
+        xQueueReceive(xAlarmQueue, &latest, 0);
+
         bool sounding = alarm_should_sound(g_motion_flag);
         if (sounding != prev_sounding) {
             log_line(sounding ? "ALARM: buzzer on" : "ALARM: buzzer off");

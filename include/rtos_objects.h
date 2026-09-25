@@ -4,8 +4,11 @@
 #include "queue.h"
 #include "semphr.h"
 
-/* Latest sensor sample, length 1: SensorTask overwrites, DisplayTask receives. */
-extern QueueHandle_t xSensorQueue;
+/* Latest SensorData_t sample, one queue per consumer, each of length 1:
+ * SensorTask overwrites both every period, each consumer receives from its
+ * own, so neither consumer can take a sample away from the other. */
+extern QueueHandle_t xDisplayQueue;
+extern QueueHandle_t xAlarmQueue;
 
 /* Guards USART1: held by log_line() for one whole line at a time. */
 extern SemaphoreHandle_t serialMutex;
