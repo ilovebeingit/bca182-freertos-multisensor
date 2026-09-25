@@ -18,6 +18,7 @@ extern uint32_t SystemCoreClock;
 #define configIDLE_SHOULD_YIELD                 1
 #define configUSE_MUTEXES                       1
 #define configSUPPORT_DYNAMIC_ALLOCATION        1
+#define configUSE_PORT_OPTIMISED_TASK_SELECTION 0
 
 #define INCLUDE_vTaskPrioritySet                1
 #define INCLUDE_uxTaskPriorityGet               1

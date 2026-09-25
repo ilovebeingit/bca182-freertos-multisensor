@@ -90,6 +90,10 @@ void SysTick_Handler(void) {
 }
 
 int main(void) {
+    /* SystemInit() leaves VTOR at its reset value 0. FreeRTOS reads the initial
+     * MSP from *VTOR when starting the first task, which only works where 0x0
+     * aliases flash, so point VTOR at the flash vector table explicitly. */
+    SCB->VTOR = FLASH_BASE;
     HAL_Init();
     SystemClock_Config();
     MX_GPIO_Init();
