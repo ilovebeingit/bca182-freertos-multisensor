@@ -10,58 +10,71 @@
 #include "serial_log.h"
 #include "system_state.h"
 
-#define SSD1306_I2C_ADDR (0x3C << 1)
+/* SSD1306 over I2C: 7-bit address 0x3C, shifted for the HAL. The first byte
+ * of every transfer is a control byte: 0x00 = the rest are commands,
+ * 0x40 = the rest are GDDRAM data. */
+#define SSD1306_I2C_ADDR   (0x3C << 1)
+#define SSD1306_CTRL_CMD   0x00
+#define SSD1306_CTRL_DATA  0x40
 
+static constexpr uint32_t kI2cTimeoutMs = 100;
+static constexpr uint16_t kFlushChunk = 128;   /* data bytes per I2C transfer */
+
+/* Only this file (and only DisplayTask, after display_init) touches I2C1 and
+ * the panel. */
 static I2C_HandleTypeDef hi2c1;
-static uint8_t SSD1306_Buffer[kDisplayBufferSize];
+static uint8_t s_frame[kDisplayBufferSize];    /* 128 x 64 / 8 = 1024 bytes */
 
-static void SSD1306_SendCmd(uint8_t cmd) {
-    uint8_t data[2] = {0x00, cmd};
-    HAL_I2C_Master_Transmit(&hi2c1, SSD1306_I2C_ADDR, data, 2, 100);
+static const uint8_t kInitSequence[] = {
+    0xAE,         /* display off */
+    0x20, 0x00,   /* memory addressing mode: horizontal */
+    0xB0,         /* page start 0 (page addressing mode only) */
+    0xC8,         /* COM scan remapped: row 0 at the top */
+    0x00, 0x10,   /* column start 0 (page addressing mode only) */
+    0x40,         /* display start line 0 */
+    0x81, 0xFF,   /* contrast */
+    0xA1,         /* segment remap: column 0 at the left */
+    0xA6,         /* normal (not inverted) */
+    0xA8, 0x3F,   /* multiplex ratio: 64 rows */
+    0xA4,         /* display follows GDDRAM */
+    0xD3, 0x00,   /* display offset 0 */
+    0xD5, 0xF0,   /* clock divide / oscillator */
+    0xD9, 0x22,   /* pre-charge period */
+    0xDA, 0x12,   /* COM pins: alternative config, for 128x64 */
+    0xDB, 0x20,   /* VCOMH deselect level */
+    0x8D, 0x14,   /* charge pump on */
+    0xAF,         /* display on */
+};
+
+static void ssd1306_command(uint8_t cmd) {
+    uint8_t data[2] = {SSD1306_CTRL_CMD, cmd};
+    HAL_I2C_Master_Transmit(&hi2c1, SSD1306_I2C_ADDR, data, sizeof(data), kI2cTimeoutMs);
 }
 
-static void SSD1306_Init(void) {
-    SSD1306_SendCmd(0xAE);
-    SSD1306_SendCmd(0x20);
-    SSD1306_SendCmd(0x00);
-    SSD1306_SendCmd(0xB0);
-    SSD1306_SendCmd(0xC8);
-    SSD1306_SendCmd(0x00);
-    SSD1306_SendCmd(0x10);
-    SSD1306_SendCmd(0x40);
-    SSD1306_SendCmd(0x81);
-    SSD1306_SendCmd(0xFF);
-    SSD1306_SendCmd(0xA1);
-    SSD1306_SendCmd(0xA6);
-    SSD1306_SendCmd(0xA8);
-    SSD1306_SendCmd(0x3F);
-    SSD1306_SendCmd(0xA4);
-    SSD1306_SendCmd(0xD3);
-    SSD1306_SendCmd(0x00);
-    SSD1306_SendCmd(0xD5);
-    SSD1306_SendCmd(0xF0);
-    SSD1306_SendCmd(0xD9);
-    SSD1306_SendCmd(0x22);
-    SSD1306_SendCmd(0xDA);
-    SSD1306_SendCmd(0x12);
-    SSD1306_SendCmd(0xDB);
-    SSD1306_SendCmd(0x20);
-    SSD1306_SendCmd(0x8D);
-    SSD1306_SendCmd(0x14);
-    SSD1306_SendCmd(0xAF);
+static void ssd1306_init(void) {
+    for (uint16_t i = 0; i < sizeof(kInitSequence); i++) {
+        ssd1306_command(kInitSequence[i]);
+    }
 }
 
-static void SSD1306_UpdateScreen(void) {
-    uint8_t chunk[kDisplayWidth + 1];
-    chunk[0] = 0x40;
+/* Sends the whole frame buffer. In horizontal addressing mode the panel's
+ * write pointer runs along a page, column 0..127, then wraps to the next
+ * page, so after setting the window to all columns and all pages the 1024
+ * buffer bytes can simply be streamed in order. */
+static void ssd1306_flush(void) {
+    uint8_t chunk[1 + kFlushChunk];
 
-    for (uint8_t i = 0; i < kDisplayPages; i++) {
-        SSD1306_SendCmd(0xB0 + i);
-        SSD1306_SendCmd(0x00);
-        SSD1306_SendCmd(0x10);
+    ssd1306_command(0x21);                      /* column address window */
+    ssd1306_command(0);
+    ssd1306_command(kDisplayWidth - 1);
+    ssd1306_command(0x22);                      /* page address window */
+    ssd1306_command(0);
+    ssd1306_command(kDisplayPages - 1);
 
-        memcpy(&chunk[1], &SSD1306_Buffer[kDisplayWidth * i], kDisplayWidth);
-        HAL_I2C_Master_Transmit(&hi2c1, SSD1306_I2C_ADDR, chunk, sizeof(chunk), 100);
+    chunk[0] = SSD1306_CTRL_DATA;
+    for (uint16_t offset = 0; offset < kDisplayBufferSize; offset += kFlushChunk) {
+        memcpy(&chunk[1], &s_frame[offset], kFlushChunk);
+        HAL_I2C_Master_Transmit(&hi2c1, SSD1306_I2C_ADDR, chunk, sizeof(chunk), kI2cTimeoutMs);
     }
 }
 
@@ -84,17 +97,18 @@ void display_init(void) {
 }
 
 void DisplayTask(void *pvParameters) {
+    /* Encoder-driven mode switching arrives in Stage 7. */
+    const DisplayMode mode = DisplayMode::TEMPERATURE;
     SensorData_t sample;
 
     log_line("DisplayTask started");
-    SSD1306_Init();
+    ssd1306_init();
     log_line("DISPLAY: OLED initialised");
 
     for (;;) {
         if (xQueueReceive(xDisplayQueue, &sample, portMAX_DELAY) == pdTRUE) {
-            display_render_dashboard(SSD1306_Buffer, &sample,
-                                     g_motion_flag != 0, g_encoder_count);
-            SSD1306_UpdateScreen();
+            display_render_screen(s_frame, mode, &sample, g_motion_flag != 0);
+            ssd1306_flush();
         }
     }
 }
