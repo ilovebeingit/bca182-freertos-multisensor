@@ -31,6 +31,9 @@
     [ "stm32:A4", "encoder:DT", "magenta", [ "v0" ] ],
     [ "stm32:A5", "encoder:SW", "white", [ "v0" ] ],
     [ "stm32:GND.1", "buzzer:1", "black", [ "v0" ] ],
-    [ "stm32:A8", "buzzer:2", "red", [ "v0" ] ]
-  ]
+    [ "stm32:A8", "buzzer:2", "red", [ "v0" ] ],
+    [ "stm32:A9", "$serialMonitor:RX", "", [] ],
+    [ "stm32:A10", "$serialMonitor:TX", "", [] ]
+  ],
+  "serialMonitor": { "display": "always", "newline": "crlf" }
 }
