@@ -1,0 +1,10 @@
+{
+    "name": "freertos_port_patch",
+    "version": "10.3.1-wokwi.1",
+    "description": "Project copy of the FreeRTOS ARM_CM3 GCC port with the Wokwi PRIMASK/FAULTMASK workaround in prvPortStartFirstTask (see docs/dev-log.md). Not archived, so its port.o is linked as an object and the FreeRTOS library archive's own port.o is never pulled in; if any port symbol were missing here, the link would fail with a duplicate definition instead of silently using the unpatched port.",
+    "frameworks": "stm32cube",
+    "platforms": "ststm32",
+    "build": {
+        "libArchive": false
+    }
+}
