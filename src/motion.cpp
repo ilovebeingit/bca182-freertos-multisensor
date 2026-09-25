@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "motion_logic.h"
+#include "serial_log.h"
 #include "system_state.h"
 
 void motion_init(void) {
@@ -19,9 +20,18 @@ void motion_init(void) {
 }
 
 void MotionTask(void *pvParameters) {
+    bool prev_detected = false;
+
+    log_line("MotionTask started");
+
     for (;;) {
         bool out = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2) == GPIO_PIN_SET;
-        g_motion_flag = pir_motion_detected(out) ? 1 : 0;
+        bool detected = pir_motion_detected(out);
+        g_motion_flag = detected ? 1 : 0;
+        if (detected != prev_detected) {
+            log_line(detected ? "MOTION: detected" : "MOTION: clear");
+        }
+        prev_detected = detected;
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "alarm_logic.h"
+#include "serial_log.h"
 #include "system_state.h"
 
 void alarm_init(void) {
@@ -19,8 +20,18 @@ void alarm_init(void) {
 }
 
 void AlarmTask(void *pvParameters) {
+    bool prev_sounding = false;
+
+    log_line("AlarmTask started");
+
     for (;;) {
-        if (alarm_should_sound(g_motion_flag)) {
+        bool sounding = alarm_should_sound(g_motion_flag);
+        if (sounding != prev_sounding) {
+            log_line(sounding ? "ALARM: buzzer on" : "ALARM: buzzer off");
+        }
+        prev_sounding = sounding;
+
+        if (sounding) {
             for (uint32_t i = 0; i < kAlarmBurstCycles; i++) {
                 HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
                 vTaskDelay(pdMS_TO_TICKS(kAlarmHalfPeriodMs));

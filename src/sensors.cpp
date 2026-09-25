@@ -1,9 +1,12 @@
 #include "sensors.h"
 
+#include <stdio.h>
+
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "rtos_objects.h"
+#include "serial_log.h"
 #include "system_state.h"
 
 static ADC_HandleTypeDef hadc1;
@@ -44,6 +47,9 @@ void sensors_init(void) {
 
 void SensorTask(void *pvParameters) {
     RoomData_t sensorData = {24.5f, 60.0f, 0, 0, 0, 0};
+    char line[64];
+
+    log_line("SensorTask started");
 
     for (;;) {
         HAL_ADC_Start(&hadc1);
@@ -58,6 +64,11 @@ void SensorTask(void *pvParameters) {
 
         HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
         xQueueOverwrite(xSensorQueue, &sensorData);
+
+        snprintf(line, sizeof(line), "SENSOR light=%u motion=%u encoder=%ld button=%u",
+                 sensorData.light_level, sensorData.motion_detected,
+                 (long)sensorData.encoder_count, sensorData.button_pressed);
+        log_line(line);
 
         vTaskDelay(pdMS_TO_TICKS(500));
     }

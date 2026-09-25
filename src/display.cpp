@@ -7,6 +7,7 @@
 #include "task.h"
 #include "display_logic.h"
 #include "rtos_objects.h"
+#include "serial_log.h"
 #include "system_state.h"
 
 #define SSD1306_I2C_ADDR (0x3C << 1)
@@ -85,7 +86,9 @@ void display_init(void) {
 void DisplayTask(void *pvParameters) {
     RoomData_t rxData;
 
+    log_line("DisplayTask started");
     SSD1306_Init();
+    log_line("DISPLAY: OLED initialised");
 
     for (;;) {
         if (xQueueReceive(xSensorQueue, &rxData, portMAX_DELAY) == pdTRUE) {

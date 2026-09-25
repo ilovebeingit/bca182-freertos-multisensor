@@ -8,6 +8,7 @@
 #include "motion.h"
 #include "rtos_objects.h"
 #include "sensors.h"
+#include "serial_log.h"
 
 static void SystemClock_Config(void);
 
@@ -32,6 +33,10 @@ int main(void) {
     SCB->VTOR = FLASH_BASE;
     HAL_Init();
     SystemClock_Config();
+
+    serial_log_init();
+    log_line("BCA182 FreeRTOS Multisensor");
+    log_line("System starting...");
 
     sensors_init();
     motion_init();
