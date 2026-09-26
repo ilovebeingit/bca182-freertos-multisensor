@@ -81,7 +81,7 @@ accepted findings without changing them:
 - Adding `app_main()` moved finding 29 to `main.cpp:36`. Replacing the
   FreeRTOS port (which removed the application's `SysTick_Handler`) then
   moved it to `main.cpp:30`.
-- A longer comment above the DHT22 read moved findings 24-25 from
+- A longer comment above the DHT22 read moved findings 12-13 from
   `dht22.cpp:99` and `:104` to `:104` and `:109`.
 
 The latest run (after the port replacement, which added `include/portmacro.h`
