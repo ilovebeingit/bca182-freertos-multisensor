@@ -75,12 +75,18 @@ left in as ineffective noise, and the findings stay visible in the report.
 
 ## All findings
 
-Line numbers are from the first run. Two findings have since moved:
+Line numbers are from the first run. Later edits moved some of the 12
+accepted findings without changing them:
 - Fixing `serial_log.cpp:45-46` moved finding 39 to line 53.
-- Adding `app_main()` moved finding 29 to `main.cpp:36`.
+- Adding `app_main()` moved finding 29 to `main.cpp:36`. Replacing the
+  FreeRTOS port (which removed the application's `SysTick_Handler`) then
+  moved it to `main.cpp:30`.
+- A longer comment above the DHT22 read moved findings 24-25 from
+  `dht22.cpp:99` and `:104` to `:104` and `:109`.
 
-Every other line is unchanged. The final run (after `app_main()`) still
-reports exactly the 12 accepted findings.
+The latest run (after the port replacement, which added `include/portmacro.h`
+and the new `port.c`) still reports exactly these 12 accepted findings and
+nothing new.
 
 | # | Env | Severity | Finding | File/Line | Cause | Resolution |
 |---|---|---|---|---|---|---|

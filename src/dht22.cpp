@@ -75,10 +75,15 @@ Dht22Status dht22_read(Dht22Reading *out) {
     vTaskDelay(pdMS_TO_TICKS(2));
 
     /* From release to the last bit (about 4-5 ms) every edge must be seen
-     * within a few microseconds. The critical section masks SysTick/PendSV
-     * and every interrupt at or below configMAX_SYSCALL_INTERRUPT_PRIORITY,
-     * so neither a context switch nor an ISR can stretch a measurement. Only
-     * pulse widths are captured here; decoding and logging happen after. */
+     * within a few microseconds: a '0' and a '1' differ only in how long the
+     * line stays high (26-28 us vs 70 us). If a tick, or a context switch
+     * made from it, landed in the middle of a bit, that pulse would measure
+     * too long and could be misread, so this stretch runs in a critical
+     * section. With this project's FreeRTOS port that gates the SysTick
+     * interrupt (the only interrupt in the system) and, when the section
+     * ends, catches up the ticks that fell inside it, so the RTOS tick count
+     * stays right even though this lasts several ticks. Only pulse widths
+     * are captured here; decoding and logging happen after. */
     taskENTER_CRITICAL();
 
     pa0_release();

@@ -122,24 +122,21 @@ the ICSR store inside SVC_Handler. The SVC frame's own return PC was correct
    r0 = PSP). Conditional LDR/STR were correctly skipped. The project firmware
    contains no conditional MRS/MSR, so this one does not affect it.
 
-Not measured: whether PRIMASK = 1 blocks interrupts. The earlier FreeRTOS
-snapshot showed SysTick still counting with PRIMASK reading 1.
+6. **PRIMASK and FAULTMASK do not block SysTick** (measured later, in the
+   kernel-switch probe below): with either set by MSR, SysTick fired as often
+   as with both clear.
 
-### Consequences
-- FreeRTOS context switches cannot work in Wokwi (deviation 4). Routing
-  yields through SVC does not help (deviations 3 and 4), so that fix was not
-  applied.
-- In Wokwi, every BASEPRI critical section (kernel internals, mutexes, queues,
-  `taskENTER_CRITICAL` in the DHT22 read) protects nothing (deviations 2 and 3).
-- On real hardware all of this behaves as the architecture specifies. Nothing
-  here points to a firmware or configuration bug.
-- The `prvPortStartFirstTask` MSR workaround stays: it is correct and a no-op
-  on hardware.
-- Runtime verification is blocked in Wokwi until the scheduler issue is
-  resolved; use real hardware (or an emulator with an accurate NVIC model).
-
-### Still open
-- Real hardware has not been tested.
+### What this meant
+- The stock port's context switch, which pends PendSV by storing to ICSR,
+  cannot work in Wokwi (deviation 4). Pending PendSV from the SVC handler
+  does not help either (deviations 3 and 4).
+- Every BASEPRI critical section (kernel internals, mutexes, queues, the
+  DHT22 read) protected nothing in Wokwi (deviations 2 and 3).
+- None of this is a firmware or configuration bug; real hardware behaves as
+  the architecture specifies.
+- It did not mean the scheduler could never run in Wokwi: the mechanisms
+  that *do* work were identified next, and a port built on them fixed it
+  (see "the scheduler runs in Wokwi" below).
 
 ## 2026-09-26: event groups are not built by default
 
@@ -203,3 +200,91 @@ most 500 ms of added latency, well within the 15 s timeout.
   plain cppcheck 2.11 honoured them. The 12 C-style casts that come from
   CMSIS/FreeRTOS macros are therefore left visible and marked accepted. Full
   details are in `docs/static-analysis.md`.
+
+## 2026-09-26: synchronous-switch port, the scheduler runs in Wokwi
+
+### Root cause, in one place
+The stock FreeRTOS Cortex-M3 port depends on three things that Wokwi's
+Cortex-M3 model gets wrong (see the two entries above):
+- it starts the first task with `cpsie i; cpsie f; svc 0`, and Wokwi's `cpsie`
+  *sets* PRIMASK/FAULTMASK, so the `svc` was never taken;
+- it switches tasks by pending PendSV with a store to ICSR, and Wokwi returns
+  from that exception to the store itself, so every yield re-pends forever;
+- it protects critical sections with BASEPRI, which Wokwi does not implement
+  (and PRIMASK/FAULTMASK do not block SysTick either).
+
+The first was fixed with an MSR workaround at task launch. The other two
+needed a different port.
+
+### Probes that shaped the fix
+All run bare-metal before FreeRTOS, each reading its own results in firmware:
+- **SysTick return address:** SysTick interrupted a straight-line block of
+  `movs r4, #k` instructions; 64/64 samples stacked the correct next-
+  instruction PC. Hardware-triggered exceptions are emulated correctly; only
+  ICSR-store-triggered ones are wrong.
+- **Switching inside the handlers:** two tasks with register-invariant loops.
+  Twenty context switches done directly in SysTick, and twenty done directly
+  in SVC (`svc 1`), all alternated correctly with no invariant broken.
+  PRIMASK = 1 or FAULTMASK = 1 set by MSR did *not* stop SysTick (175/176
+  ticks per busy loop, the same as unmasked).
+- **Gating SysTick with `SysTick->CTRL.TICKINT`:** clearing TICKINT stopped
+  the tick handler; COUNTFLAG latched a wrap that fell inside the gated
+  window; short windows straddling a tick boundary saw no switch and no
+  handler entry, and the one missed tick was recovered on exit. (A reporting
+  bug in that probe first printed "handler 37 + recovered 20 = 40": the
+  handler count was re-read after two log lines had taken ~17 ms to transmit.
+  The correct figures were 20 + 20 = 40.)
+- **DHT22-length windows (4.5 ms, several ticks):** COUNTFLAG alone recovers
+  at most one tick. Recovery from DWT elapsed cycles divided by cycles-per-
+  tick was clearly worse than recovery from DWT elapsed cycles *plus*
+  SysTick's position (VAL) at entry, which counts actual tick boundaries and
+  was accurate to better than 99 % (as reported from the probe run).
+
+### The fix
+`lib/freertos_port_patch/src/port.c` and `include/portmacro.h` replace the
+library's ARM_CM3 port (`include/` precedes the library's port directory on
+the kernel's include path, so the kernel compiles against the new
+`portmacro.h`):
+- **No PendSV.** `portYIELD()` calls `vPortYield()`, which executes `svc 1`;
+  the SVC handler saves the task, runs `vTaskSwitchContext()` and restores
+  the next task. The SysTick handler does the same when the tick interrupts
+  a task and the kernel asks for a switch.
+- **Critical sections gate SysTick** (TICKINT = 0). SysTick is the only
+  interrupt that uses the kernel, so this is enough for mutual exclusion.
+- **Missed ticks are recovered** when the outermost critical section ends:
+  the SysTick wraps inside it are computed from DWT cycles and SysTick VAL at
+  entry, and replayed with `xTaskIncrementTick()` *before* TICKINT is set
+  again, so the catch-up cannot race the tick handler. A switch it requests
+  (or one requested inside the critical section) is then done with `svc 1`.
+- **COUNTFLAG bookkeeping:** the tick handler reads SysTick->CTRL on entry and
+  every gated window reads it before ungating, so the flag never double-counts.
+- The HAL tick moved from the old SysTick wrapper to `vApplicationTickHook()`.
+  Once the scheduler runs, the kernel calls it once per tick, recovered ticks
+  included. During boot the port calls it directly until the first kernel
+  object is created. After that, SysTick stays gated until the first task
+  starts (as BASEPRI masking did in the stock port).
+- Checked in the image: no store to ICSR and no BASEPRI access anywhere; the
+  kernel objects call `vPortYield` and the gated critical sections; SVC and
+  SysTick vectors point at the new handlers.
+
+Known residual: a SysTick wrap in the few instructions between gating and
+reading VAL at entry, or between the last cycle-counter read and ungating at
+exit, can make the tick count gain or lose one tick. Kernel state is never
+corrupted.
+
+### Verification
+- Observed in the Wokwi terminal: all six tasks start, SensorTask samples
+  every 2 s, and StateTask moves the system to INACTIVE after 15 s without
+  motion.
+- A GDB memory snapshot after ~24 s of simulated time agreed: 7 tasks (6 +
+  idle) with the CPU in the idle task (so every other task was blocked
+  normally), `xTickCount` 24 451 with the HAL tick at 24 462 (the 11-tick lead
+  is the HAL counting during boot), critical-section nesting 0, event bits 0
+  (INACTIVE, no motion, no alarm), and the last queued sample 24.0 °C /
+  40.0 %RH / 76 % light, consumed by DisplayTask.
+
+### Still open
+- Real hardware has not been tested. The port is also correct there, but the
+  stock port is simpler and should be used on a real board.
+- Encoder, PIR and alarm behaviour are still to be exercised and recorded in
+  the simulation.

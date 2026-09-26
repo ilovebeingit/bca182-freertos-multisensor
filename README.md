@@ -73,7 +73,7 @@ The firmware has three layers:
 |---|---|
 | **Application tasks** | `SensorTask`, `MotionTask`, `InputTask`, `AlarmTask`, `StateTask`, `DisplayTask` (one module each) |
 | **Pure logic** (`*_logic.cpp`) | Temperature evaluation, state transitions, display-mode navigation, light scaling, DHT22 decoding, the font engine and screen layout. No HAL or FreeRTOS includes; unit tested on the host. |
-| **Platform** | STM32Cube HAL drivers, FreeRTOS 10.3.1 (with a patched Cortex-M3 port; see [Engineering Decisions](#engineering-decisions)) |
+| **Platform** | STM32Cube HAL drivers, FreeRTOS 10.3.1 with a project-specific Cortex-M3 port (see [Engineering Decisions](#engineering-decisions)) |
 
 Data flows in one direction. The sensor and input tasks produce samples,
 modes and status flags. Consumers (display, alarm, state machine) receive them
@@ -93,11 +93,17 @@ startup failure is logged as a `FATAL:` line.
 - **Scheduling:** fixed priorities 1-3. Periodic tasks use
   `vTaskDelayUntil()`, so their periods do not drift with execution time.
   Every task blocks on each loop iteration; none busy-waits.
-- **Tick handling:** `SysTick_Handler` always advances the HAL tick (so HAL
-  timeouts work before and after the scheduler starts) and passes the tick to
-  FreeRTOS only once the scheduler is running.
-- **Interrupt priorities:** `configMAX_SYSCALL_INTERRUPT_PRIORITY` is 5, and
-  the kernel (PendSV/SysTick) runs at the lowest priority, 15.
+- **Port:** a project-specific Cortex-M3 port that runs correctly under
+  Wokwi's CPU emulation:
+  - context switches happen synchronously inside the SVC handler (yields) and
+    the SysTick handler (ticks); PendSV is never used;
+  - critical sections gate the SysTick interrupt, and recover any ticks that
+    fell inside them from the DWT cycle counter.
+
+  See [Engineering Decisions](#engineering-decisions) and
+  [`docs/design-notes.md`](docs/design-notes.md#freertos-port-wokwi-specific).
+- **Tick handling:** the port owns `SysTick_Handler`. The FreeRTOS tick hook
+  (`vApplicationTickHook`) advances the HAL tick, so HAL timeouts keep working.
 - **Kernel objects:** 3 queues, 1 queue set, 1 event group and 1 mutex,
   documented in [`docs/design-notes.md`](docs/design-notes.md).
 - **Optional kernel features enabled:** mutexes, queue sets and event groups.
@@ -235,8 +241,10 @@ supplies its inputs by waiting on `EVENT_MOTION` for the time remaining in the
 │   ├── rtos_objects.cpp    Creation of all queues, event group and mutex
 │   ├── serial_log.cpp      USART1 logging behind serialMutex
 │   └── *_logic.cpp         Hardware-independent logic (unit tested)
-├── include/                Headers for each module, plus FreeRTOSConfig.h
-├── lib/freertos_port_patch FreeRTOS Cortex-M3 port with a simulator workaround
+├── include/                Headers for each module, FreeRTOSConfig.h, and the
+│                           port's portmacro.h
+├── lib/freertos_port_patch FreeRTOS Cortex-M3 port: synchronous SVC/SysTick
+│                           switching, SysTick-gated critical sections
 ├── test/                   Unity tests (alarm, light level, navigation, state)
 ├── docs/
 │   ├── design-notes.md     Tasks and every RTOS object: roles and rationale
@@ -294,12 +302,12 @@ System starting...
 > This section will cover starting the simulation from VS Code, the expected
 > serial output, and how to use the encoder, PIR and DHT22 controls, with
 > screenshots.
->
-> Known issue: in the current Wokwi STM32 simulation the FreeRTOS scheduler
-> does not complete its first context switch, because of Cortex-M
-> exception-handling differences in the simulator. Only the pre-scheduler boot
-> output is observable there. See [Engineering Decisions](#engineering-decisions)
-> and [`docs/dev-log.md`](docs/dev-log.md).
+
+The FreeRTOS scheduler runs correctly in Wokwi under the project's custom
+port. In the Wokwi terminal, all six tasks start, SensorTask logs a sample
+every 2 s, and StateTask switches the system to INACTIVE after 15 s without
+motion. Why a custom port is needed is covered under
+[Engineering Decisions](#engineering-decisions).
 
 ## Unit Testing
 
@@ -393,17 +401,28 @@ Every finding, with file, line, cause and resolution, is listed in
   the binary). The buzzer's TIM1 prescaler is computed at runtime from the
   real APB2 timer clock (8 MHz -> PSC 7, ARR 999 -> 1 kHz), so adding a PLL
   later will not change the tone.
-- **Simulator limitation, investigated rather than worked around blindly.**
-  Under Wokwi, FreeRTOS never started its first task. In-firmware probes
-  found several differences in how the simulator emulates the Cortex-M3
-  compared with the ARMv7-M architecture:
+- **A custom FreeRTOS port, designed from measured simulator behaviour.**
+  Under Wokwi the stock port hung: the scheduler never started the first
+  task, and once that was fixed, context switches looped forever. In-firmware
+  probes found where the simulator's Cortex-M3 emulation departs from the
+  ARMv7-M architecture:
   - `cpsie`/`cpsid` are inverted;
-  - BASEPRI and exception priorities are not enforced;
-  - an exception triggered by a store to `ICSR` returns to that store, so it
-    runs again.
+  - BASEPRI is not implemented, and PRIMASK does not block SysTick;
+  - an exception pended by a store to `ICSR` (how PendSV is requested)
+    returns to that store, so it runs again forever.
 
-  A minimal, clearly marked patch to the FreeRTOS port (in
-  `lib/freertos_port_patch`, a no-op on real hardware) fixes the first-task
-  launch. Context switching cannot be fixed without rewriting the port for the
-  simulator, so the firmware is kept architecturally correct for real
-  hardware. The full investigation is in [`docs/dev-log.md`](docs/dev-log.md).
+  Further probes showed what does work: SVC and SysTick return correctly,
+  and gating SysTick with its `TICKINT` bit stops it cleanly. The port in
+  `lib/freertos_port_patch` and `include/portmacro.h` is built only on those:
+  - context switches happen synchronously inside the SVC handler (yields) and
+    the SysTick handler (ticks), with no PendSV at all;
+  - critical sections gate `TICKINT`. When one ends, the tick boundaries that
+    passed inside it are computed from the DWT cycle counter and SysTick's
+    position at entry, and replayed *before* the tick interrupt is re-enabled.
+    So even the 4-5 ms DHT22 read keeps the tick count right, apart from a
+    rare one-tick error if a tick boundary lands in the few instructions at
+    either edge.
+
+  With it, the scheduler runs correctly in Wokwi. The investigation, the probe
+  results and the design are in [`docs/dev-log.md`](docs/dev-log.md) and
+  [`docs/design-notes.md`](docs/design-notes.md#freertos-port-wokwi-specific).

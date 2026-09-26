@@ -4,9 +4,10 @@ How the firmware's tasks communicate, and why each queue, mutex, queue set
 and event-group bit exists. All kernel objects are created in
 `rtos_objects_create()` (`src/rtos_objects.cpp`) before the scheduler starts.
 
-Runtime behaviour has not been verified in Wokwi: its Cortex-M emulation
-cannot run the FreeRTOS scheduler (see `docs/dev-log.md`). Everything below
-describes the design as implemented.
+The firmware runs on a project-specific FreeRTOS port (described at the end
+of this document) because Wokwi's Cortex-M3 emulation cannot run the stock
+one. With it, the scheduler runs in Wokwi: all six tasks start, SensorTask
+samples every 2 s, and StateTask goes INACTIVE after 15 s without motion.
 
 ## Tasks
 
@@ -98,6 +99,74 @@ exactly one writer.
   by one task only: `hadc1` (SensorTask), `hi2c1` and the frame buffer
   (DisplayTask), `htim1` (AlarmTask). `huart1` is shared, behind `serialMutex`.
 - The DHT22 bit capture (about 4-5 ms) runs inside
-  `taskENTER_CRITICAL()`/`taskEXIT_CRITICAL()`, so no context switch or
-  kernel-level interrupt can stretch a pulse measurement. Decoding and logging
-  happen after the critical section ends.
+  `taskENTER_CRITICAL()`/`taskEXIT_CRITICAL()`, which gates SysTick (see
+  below), so no tick and therefore no preemptive context switch can stretch a
+  pulse measurement. The ticks that fall inside it are recovered when it ends.
+  Decoding and logging happen after the critical section ends.
+
+## FreeRTOS port (Wokwi-specific)
+
+`lib/freertos_port_patch/src/port.c` and `include/portmacro.h` replace the
+FreeRTOS library's ARM_CM3 port. `include/` comes before the library's port
+directory on the kernel's include path, so `tasks.c`, `queue.c` and
+`event_groups.c` compile against this `portmacro.h`. The port library is linked
+as objects, not as an archive, so the library's own `port.o` is never pulled
+in. Why it exists: Wokwi mis-emulates PendSV when it is pended by a store to
+ICSR, does not implement BASEPRI, and does not block SysTick with PRIMASK;
+`docs/dev-log.md` has the probes.
+
+### Context switching: synchronous, never through PendSV
+- **Yield** (`portYIELD()`, used by every blocking kernel call):
+  `vPortYield()` executes `svc 1`. `SVC_Handler` gates SysTick, saves r4-r11
+  onto the task's stack (the hardware has already stacked r0-r3, r12, lr, pc
+  and xPSR), runs `vTaskSwitchContext()`, restores the next task's registers
+  and returns to it on its own stack (PSP).
+- **Tick:** `SysTick_Handler` does the same when it interrupted a task and
+  `xTaskIncrementTick()` (or an earlier deferred request) asks for a switch.
+  This gives time-slicing and wakes delayed tasks.
+- **First task:** `svc 0`, after clearing PRIMASK/FAULTMASK with MSR (Wokwi's
+  `cpsie` sets them instead of clearing them). SysTick's interrupt is enabled
+  at that moment.
+- A yield requested inside a critical section, or from an interrupt, is
+  deferred: it is performed when the critical section ends or at the next
+  tick.
+
+### Critical sections: gating SysTick, then recovering missed ticks
+- SysTick is the only interrupt that uses the kernel, so keeping it out is
+  enough for mutual exclusion. `vPortEnterCritical()` clears `TICKINT` in
+  `SysTick->CTRL` (the counter keeps running) and, for the outermost level,
+  records SysTick's current value (`VAL`) and the DWT cycle counter.
+- `vPortExitCritical()` (outermost level), still gated:
+  1. Reads the cycle counter and `SysTick->CTRL` (clearing COUNTFLAG).
+  2. Computes how many SysTick periods ended inside the window:
+     `((LOAD - VAL_entry) + cycles_elapsed) / (LOAD + 1)`. This counts actual
+     tick boundaries, not just elapsed time, so a 4.5 ms DHT22 window is
+     recovered correctly whichever point in a tick it starts at.
+  3. Replays that many ticks with `xTaskIncrementTick()` **before** re-enabling
+     the interrupt, so the catch-up can never run at the same time as the tick
+     handler.
+  4. Sets `TICKINT` again, and if a switch is due, does it with `svc 1`.
+- The tick handler reads `SysTick->CTRL` as its first action and every gated
+  window reads it before ungating, so COUNTFLAG only ever reports a wrap that
+  nobody has accounted for. The SVC handler's own short gated window uses
+  COUNTFLAG to catch a tick that fell during the switch.
+- The "from ISR" interrupt mask is a no-op, because no interrupt other than
+  SysTick calls the kernel.
+- Known limit: a tick that wraps in the few instructions between gating and
+  reading `VAL`, or between the last cycle-counter read and ungating, can make
+  the tick count gain or lose one tick. It never corrupts kernel state.
+
+### Tick for the HAL
+The port owns `SysTick_Handler`. The FreeRTOS tick hook,
+`vApplicationTickHook()` in `main.cpp`, calls `HAL_IncTick()`, so HAL timeouts
+keep working:
+- **Once the scheduler runs:** the kernel calls the hook once per tick,
+  including ticks recovered after a critical section.
+- **During boot:** the port calls the hook directly until the first kernel
+  object is created. From then until the first task starts, SysTick stays
+  gated (as the stock port kept interrupts masked with BASEPRI), so the HAL
+  tick pauses briefly. Nothing in that stretch of startup waits on a HAL
+  timeout.
+
+On real hardware this port is also correct, but the library's stock port is
+simpler and is the better choice there.
