@@ -41,9 +41,12 @@ void InputTask(void *pvParameters) {
         bool clk = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3) == GPIO_PIN_SET;
         bool dt = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_4) == GPIO_PIN_SET;
 
+        /* The encoder is decoded all the time, so no false step appears when
+         * the system wakes up, but it only changes the mode while ACTIVE. */
         int8_t step = encoder_step(prev_clk, clk, dt);
         prev_clk = clk;
-        if (step != 0) {
+        bool active = (xEventGroupGetBits(xSystemEvents) & EVENT_ACTIVE) != 0;
+        if (step != 0 && active) {
             /* +1 is clockwise (next), -1 counterclockwise (previous). */
             mode = step > 0 ? nextDisplayMode(mode) : previousDisplayMode(mode);
             xQueueOverwrite(xModeQueue, &mode);

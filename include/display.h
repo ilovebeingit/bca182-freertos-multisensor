@@ -7,6 +7,7 @@
 void display_init(void);
 
 /* Initialises the panel, then blocks on xDisplayEvents and redraws the
- * current mode's screen whenever a new sample (xDisplayQueue, every 2 s) or a
- * new mode (xModeQueue, from the encoder) arrives. */
+ * current mode's screen whenever a new sample (xDisplayQueue, every 2 s), a
+ * new mode (xModeQueue, from the encoder) or an EVENT_MOTION / EVENT_ALARM
+ * change arrives. While EVENT_ACTIVE is clear the OLED is blank. */
 void DisplayTask(void *pvParameters);

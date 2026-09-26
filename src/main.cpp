@@ -9,6 +9,7 @@
 #include "rtos_objects.h"
 #include "sensors.h"
 #include "serial_log.h"
+#include "system_state.h"
 
 static void SystemClock_Config(void);
 
@@ -50,6 +51,7 @@ int main(void) {
         xTaskCreate(InputTask,   "InputTask",   128, NULL, 3, NULL);
         xTaskCreate(MotionTask,  "MotionTask",  128, NULL, 3, NULL);
         xTaskCreate(AlarmTask,   "AlarmTask",   128, NULL, 2, NULL);
+        xTaskCreate(StateTask,   "StateTask",   128, NULL, 2, NULL);
 
         vTaskStartScheduler();
     }

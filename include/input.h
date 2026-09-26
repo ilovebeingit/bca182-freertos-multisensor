@@ -6,5 +6,6 @@ void input_init(void);
 
 /* Every 5 ms (vTaskDelayUntil): decodes the encoder, steps the display mode
  * (clockwise = next, counterclockwise = previous) and overwrites the new mode
- * into xModeQueue; logs mode changes and button presses. */
+ * into xModeQueue; logs mode changes and button presses. Encoder steps change
+ * the mode only while EVENT_ACTIVE is set. */
 void InputTask(void *pvParameters);

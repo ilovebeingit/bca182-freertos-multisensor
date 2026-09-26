@@ -86,6 +86,12 @@ void SensorTask(void *pvParameters) {
 
         HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);   /* heartbeat, every period */
 
+        /* FR-08: sensing happens only while ACTIVE. The period keeps running
+         * so sampling resumes on schedule once the system is ACTIVE again. */
+        if ((xEventGroupGetBits(xSystemEvents) & EVENT_ACTIVE) == 0) {
+            continue;
+        }
+
         /* A failed DHT22 read skips this cycle: nothing is sent, so the
          * consumers keep their previous sample and never see a bad value. */
         Dht22Reading reading;

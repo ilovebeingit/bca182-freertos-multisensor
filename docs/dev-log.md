@@ -178,3 +178,16 @@ For 1 kHz: PSC = 7 (1 MHz tick), ARR = 999, CCR = 500 (50 %).
 prescaler, so the tone stays at 1 kHz if a PLL is configured later, and it
 logs the values it chose at boot (`ALARM: TIM1 clock ... Hz, PSC=..., ARR=...`).
 The actual tone in Wokwi is still to be observed.
+
+## 2026-09-26: waiting on a level event bit would spin
+
+StateTask waits on EVENT_MOTION with the remaining part of the 15 s timeout.
+EVENT_MOTION is a *level* bit: MotionTask keeps it set for as long as the PIR
+reports motion, because DisplayTask and SensorTask read its current value.
+A plain `xEventGroupWaitBits()` on a bit that stays set returns immediately
+every time, which would turn StateTask into a busy loop during motion (against
+the "every task must block" rule). Clearing the bit on exit would stop the
+spinning, but other readers would then briefly see "no motion" while motion
+is present. Fix: after seeing motion, StateTask blocks for a 500 ms hold-off
+(`vTaskDelay`) before waiting again. Motion keeps the system ACTIVE with at
+most 500 ms of added latency, well within the 15 s timeout.

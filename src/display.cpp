@@ -98,13 +98,14 @@ void display_init(void) {
 }
 
 /* Event-group bits can't join a queue set, so the set wait times out this
- * often to notice EVENT_MOTION changes for the MOTION screen. */
+ * often to notice EVENT_ACTIVE / EVENT_MOTION / EVENT_ALARM changes. */
 static constexpr uint32_t kEventPollMs = 250;
 
 void DisplayTask(void *pvParameters) {
     DisplayMode mode = kInitialDisplayMode;
     SensorData sample = {0.0f, 0.0f, 0, false};
     bool have_sample = false;
+    bool active = true;      /* the system boots ACTIVE */
     bool motion = false;
     bool alarm = false;
 
@@ -133,12 +134,24 @@ void DisplayTask(void *pvParameters) {
         }
 
         EventBits_t bits = xEventGroupGetBits(xSystemEvents);
+        bool now_active = (bits & EVENT_ACTIVE) != 0;
         bool now_motion = (bits & EVENT_MOTION) != 0;
         bool now_alarm = (bits & EVENT_ALARM) != 0;
-        if (now_motion != motion || now_alarm != alarm) {
+        if (now_active != active || now_motion != motion || now_alarm != alarm) {
+            active = now_active;
             motion = now_motion;
             alarm = now_alarm;
             changed = true;
+        }
+
+        /* INACTIVE (FR-08): blank the OLED once, then do no display work
+         * until the system is ACTIVE again. */
+        if (!active) {
+            if (changed) {
+                display_clear(s_frame);
+                ssd1306_flush();
+            }
+            continue;
         }
 
         /* Redraw only when something shown may have changed, and not before

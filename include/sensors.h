@@ -4,7 +4,8 @@
 
 void sensors_init(void);
 
-/* Every 2000 ms (vTaskDelayUntil): read the DHT22 and LDR, toggle the
- * heartbeat LED, overwrite the sample into xDisplayQueue and xAlarmQueue and
- * log it. */
+/* Every 2000 ms (vTaskDelayUntil): toggle the heartbeat LED; while
+ * EVENT_ACTIVE is set, read the DHT22 and LDR, overwrite the sample into
+ * xDisplayQueue and xAlarmQueue and log it. A failed DHT22 read skips the
+ * cycle. */
 void SensorTask(void *pvParameters);
