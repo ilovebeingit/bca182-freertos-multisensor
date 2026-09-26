@@ -42,8 +42,12 @@ void log_line(const char *msg) {
         xSemaphoreTake(serialMutex, portMAX_DELAY);
     }
 
-    HAL_UART_Transmit(&huart1, (const uint8_t *)msg, (uint16_t)strlen(msg), kUartTimeoutMs);
-    HAL_UART_Transmit(&huart1, (const uint8_t *)"\r\n", 2, kUartTimeoutMs);
+    /* HAL_UART_Transmit takes bytes; the text is sent as its raw chars. */
+    static const char kNewline[] = "\r\n";
+    HAL_UART_Transmit(&huart1, reinterpret_cast<const uint8_t *>(msg),
+                      static_cast<uint16_t>(strlen(msg)), kUartTimeoutMs);
+    HAL_UART_Transmit(&huart1, reinterpret_cast<const uint8_t *>(kNewline),
+                      sizeof(kNewline) - 1, kUartTimeoutMs);
 
     if (use_mutex) {
         xSemaphoreGive(serialMutex);

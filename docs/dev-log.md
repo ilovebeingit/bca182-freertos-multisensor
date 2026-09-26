@@ -191,3 +191,15 @@ spinning, but other readers would then briefly see "no motion" while motion
 is present. Fix: after seeing motion, StateTask blocks for a 500 ms hold-off
 (`vTaskDelay`) before waiting again. Motion keeps the system ACTIVE with at
 most 500 ms of added latency, well within the 15 s timeout.
+
+## 2026-09-26: static analysis (pio check)
+
+- cppcheck's `unusedFunction` produced 29 false positives per environment,
+  because `pio check` runs cppcheck one file at a time and so cannot see calls
+  made from other files. It is disabled for those runs (`check_flags`) and
+  replaced by a whole-program run, which found no unused functions (and does
+  catch a deliberately planted one).
+- `// cppcheck-suppress` comments were ignored under `pio check`, although
+  plain cppcheck 2.11 honoured them. The 12 C-style casts that come from
+  CMSIS/FreeRTOS macros are therefore left visible and marked accepted. Full
+  details are in `docs/static-analysis.md`.
