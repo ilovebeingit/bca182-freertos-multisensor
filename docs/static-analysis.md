@@ -75,8 +75,12 @@ left in as ineffective noise, and the findings stay visible in the report.
 
 ## All findings
 
-Line numbers are from the first run. Fixing `serial_log.cpp:45-46` moved
-finding 39 to line 53 in the final run; every other line is unchanged.
+Line numbers are from the first run. Two findings have since moved:
+- Fixing `serial_log.cpp:45-46` moved finding 39 to line 53.
+- Adding `app_main()` moved finding 29 to `main.cpp:36`.
+
+Every other line is unchanged. The final run (after `app_main()`) still
+reports exactly the 12 accepted findings.
 
 | # | Env | Severity | Finding | File/Line | Cause | Resolution |
 |---|---|---|---|---|---|---|
