@@ -162,3 +162,19 @@ kernel files unless optional features are requested. Fix: add
   lower percentage), change `darkness = kAdcMax - clamped` to
   `darkness = clamped` in `src/sensors_logic.cpp` and swap the two endpoint
   tests.
+
+## 2026-09-26: the MCU runs at 8 MHz, not 72 MHz
+
+Before choosing the TIM1 prescaler for the 1 kHz buzzer PWM, the real clock
+configuration was checked instead of assuming the Blue Pill's usual 72 MHz:
+`SystemClock_Config()` is empty, `SystemInit()` links as a bare `bx lr`, no
+RCC oscillator or clock configuration is linked, and `SystemCoreClock`'s
+initial value in the image is 8 000 000. So the chip runs on its reset clock:
+HSI 8 MHz with AHB and APB2 undivided, and TIM1 is clocked at 8 MHz.
+(PlatformIO's "72MHz" is only the board description.)
+
+For 1 kHz: PSC = 7 (1 MHz tick), ARR = 999, CCR = 500 (50 %).
+`alarm_init()` computes PSC from `HAL_RCC_GetPCLK2Freq()` and the APB2
+prescaler, so the tone stays at 1 kHz if a PLL is configured later, and it
+logs the values it chose at boot (`ALARM: TIM1 clock ... Hz, PSC=..., ARR=...`).
+The actual tone in Wokwi is still to be observed.

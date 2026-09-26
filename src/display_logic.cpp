@@ -229,13 +229,16 @@ static void draw_centered(uint8_t *fb, int16_t y, const char *str, uint8_t scale
 }
 
 void display_render_screen(uint8_t *fb, DisplayMode mode,
-                           const SensorData *sample, bool motion_detected) {
+                           const SensorData *sample, bool motion_detected,
+                           const char *alarm_text) {
     char value[16];
 
     display_clear(fb);
 
     draw_centered(fb, 0 * kLineHeight, "ROOM MONITOR", 1);
-    /* line 1 (y 8..15) left blank */
+    if (alarm_text != nullptr) {
+        draw_centered(fb, 1 * kLineHeight, alarm_text, 1);    /* else blank */
+    }
     draw_centered(fb, 2 * kLineHeight, display_mode_label(mode), 1);
 
     display_format_value(value, sizeof(value), mode, sample, motion_detected);

@@ -60,9 +60,10 @@ void display_format_value(char *buf, uint16_t size, DisplayMode mode,
 
 /* Renders the whole screen for one mode:
  *   ROOM MONITOR
- *   (blank line)
+ *   <alarm_text, or blank when alarm_text is nullptr>
  *   <label for mode>
  *   <value, larger scale>
  * Only the measurement for `mode` is drawn (FR-05: one at a time). */
 void display_render_screen(uint8_t *fb, DisplayMode mode,
-                           const SensorData *sample, bool motion_detected);
+                           const SensorData *sample, bool motion_detected,
+                           const char *alarm_text);

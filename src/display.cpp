@@ -5,6 +5,7 @@
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "alarm_logic.h"
 #include "display_logic.h"
 #include "rtos_objects.h"
 #include "serial_log.h"
@@ -105,6 +106,7 @@ void DisplayTask(void *pvParameters) {
     SensorData sample = {0.0f, 0.0f, 0, false};
     bool have_sample = false;
     bool motion = false;
+    bool alarm = false;
 
     log_line("DisplayTask started");
     ssd1306_init();
@@ -130,16 +132,26 @@ void DisplayTask(void *pvParameters) {
             }
         }
 
-        bool now_motion = (xEventGroupGetBits(xSystemEvents) & EVENT_MOTION) != 0;
-        if (now_motion != motion) {
+        EventBits_t bits = xEventGroupGetBits(xSystemEvents);
+        bool now_motion = (bits & EVENT_MOTION) != 0;
+        bool now_alarm = (bits & EVENT_ALARM) != 0;
+        if (now_motion != motion || now_alarm != alarm) {
             motion = now_motion;
+            alarm = now_alarm;
             changed = true;
         }
 
         /* Redraw only when something shown may have changed, and not before
          * the first sample, when there is nothing real to show. */
         if (have_sample && changed) {
-            display_render_screen(s_frame, mode, &sample, motion);
+            /* EVENT_ALARM says the buzzer is sounding; LOW vs HIGH comes from
+             * the same sample AlarmTask evaluated. */
+            const char *alarm_text = nullptr;
+            if (alarm) {
+                alarm_text = evaluateTemperature(sample.temperature) == AlarmState::LOW_TEMPERATURE
+                                 ? "ALARM LOW" : "ALARM HIGH";
+            }
+            display_render_screen(s_frame, mode, &sample, motion, alarm_text);
             ssd1306_flush();
         }
     }

@@ -1,15 +1,19 @@
 #pragma once
 
-/* Buzzer decisions and timing. Hardware-independent (no HAL/FreeRTOS). */
+/* Temperature alarm decision. Hardware-independent (no HAL/FreeRTOS). */
 
-#include <stdint.h>
+/* FR-07: the buzzer sounds when the temperature is outside this range. Both
+ * limits are inside the range (18.0 and 30.0 degC are NORMAL). */
+constexpr float kTempLowLimitC = 18.0f;
+constexpr float kTempHighLimitC = 30.0f;
 
-/* One alarm burst: kAlarmBurstCycles on/off cycles of kAlarmHalfPeriodMs each
- * way, then kAlarmBurstPauseMs of silence. With no motion the alarm task
- * re-checks every kAlarmIdlePollMs. */
-constexpr uint32_t kAlarmBurstCycles = 20;
-constexpr uint32_t kAlarmHalfPeriodMs = 2;
-constexpr uint32_t kAlarmBurstPauseMs = 100;
-constexpr uint32_t kAlarmIdlePollMs = 200;
+enum class AlarmState {
+    NORMAL,
+    LOW_TEMPERATURE,
+    HIGH_TEMPERATURE,
+};
 
-bool alarm_should_sound(uint8_t motion_flag);
+AlarmState evaluateTemperature(float temperatureC);
+
+/* Short text for the log and the OLED alarm line: "NORMAL", "LOW", "HIGH". */
+const char *alarmStateName(AlarmState state);
