@@ -44,7 +44,7 @@ The fix was not to lose the check but to run it where it works:
 2. The check is run once over the whole program instead:
 
    ```
-   cppcheck --enable=unusedFunction --language=c++ --quiet -Iinclude             -DSTM32F103xB -DUSE_HAL_DRIVER src/*.cpp
+   cppcheck --enable=unusedFunction --language=c++ --quiet -Iinclude -DSTM32F103xB -DUSE_HAL_DRIVER src/*.cpp
    ```
 
    Result: **no unused functions.** To confirm the whole-program run can
