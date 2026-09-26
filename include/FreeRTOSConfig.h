@@ -6,7 +6,7 @@ extern uint32_t SystemCoreClock;
 
 #define configUSE_PREEMPTION                    1
 #define configUSE_IDLE_HOOK                     0
-#define configUSE_TICK_HOOK                     0
+#define configUSE_TICK_HOOK                     1   /* vApplicationTickHook keeps the HAL tick */
 #define configCPU_CLOCK_HZ                      (SystemCoreClock)
 #define configTICK_RATE_HZ                      ((TickType_t)1000)
 #define configMAX_PRIORITIES                    (5)
@@ -38,7 +38,8 @@ extern uint32_t SystemCoreClock;
 #define configKERNEL_INTERRUPT_PRIORITY         (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY     (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 
-#define xPortPendSVHandler                      PendSV_Handler
-#define vPortSVCHandler                         SVC_Handler
+/* The project port (lib/freertos_port_patch, include/portmacro.h) defines
+ * SVC_Handler and SysTick_Handler itself and never uses PendSV, so no handler
+ * names are mapped here. */
 
 #endif /* FREERTOS_CONFIG_H */

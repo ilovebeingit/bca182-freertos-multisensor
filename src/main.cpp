@@ -14,18 +14,12 @@
 static void SystemClock_Config(void);
 void app_main(void);
 
-extern "C" void xPortSysTickHandler(void);
-
-/* HAL_Init() starts SysTick long before the scheduler exists. Always advance
- * the HAL tick (uwTick, which the default HAL_GetTick reads) so HAL timeouts
- * work before and after the scheduler starts, and only hand the tick to
- * FreeRTOS once the kernel is running. extern "C" so it overrides the weak
- * vector-table symbol. */
-extern "C" void SysTick_Handler(void) {
+/* The FreeRTOS port owns SysTick_Handler (it switches tasks from the tick).
+ * It calls this hook on every tick, including before the scheduler starts and
+ * for ticks recovered after a critical section, so the HAL tick (uwTick, which
+ * HAL_GetTick and every HAL timeout use) keeps counting. */
+extern "C" void vApplicationTickHook(void) {
     HAL_IncTick();
-    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
-        xPortSysTickHandler();
-    }
 }
 
 /* MCU bring-up only, then hand over to the application. */
