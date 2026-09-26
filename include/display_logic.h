@@ -54,10 +54,9 @@ uint8_t display_fit_scale(const char *str, uint8_t max_scale);
 
 const char *display_mode_label(DisplayMode mode);
 
-/* The value text for one mode, e.g. "23.5 C", "41.2 %", "1234", "DETECTED".
- * Temperature/humidity show "--.-" while the sample's DHT22 data is invalid. */
+/* The value text for one mode, e.g. "23.5 C", "41.2 %", "57 %", "DETECTED". */
 void display_format_value(char *buf, uint16_t size, DisplayMode mode,
-                          const SensorData_t *sample, bool motion_detected);
+                          const SensorData *sample, bool motion_detected);
 
 /* Renders the whole screen for one mode:
  *   ROOM MONITOR
@@ -66,4 +65,4 @@ void display_format_value(char *buf, uint16_t size, DisplayMode mode,
  *   <value, larger scale>
  * Only the measurement for `mode` is drawn (FR-05: one at a time). */
 void display_render_screen(uint8_t *fb, DisplayMode mode,
-                           const SensorData_t *sample, bool motion_detected);
+                           const SensorData *sample, bool motion_detected);

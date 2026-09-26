@@ -15,7 +15,7 @@ constexpr EventBits_t EVENT_MOTION = (1U << 1);
 constexpr EventBits_t EVENT_ALARM  = (1U << 2);
 extern EventGroupHandle_t xSystemEvents;
 
-/* Latest SensorData_t sample, one queue per consumer, each of length 1:
+/* Latest SensorData sample, one queue per consumer, each of length 1:
  * SensorTask overwrites both every period, each consumer receives from its
  * own, so neither consumer can take a sample away from the other. */
 extern QueueHandle_t xDisplayQueue;

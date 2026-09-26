@@ -148,3 +148,17 @@ STM32Cube Middleware-FreeRTOS library's build script compiles only the core
 kernel files unless optional features are requested. Fix: add
 `custom_freertos_features = event_groups` to `[env:bluepill_f103c8]` in
 `platformio.ini`. Without it, every `xEventGroup*` call fails to link.
+
+## 2026-09-26: SensorData brought in line with the specification
+
+- `SensorData` now matches CLAUDE.md exactly: `temperature`, `humidity`,
+  `int lightLevel` (0-100 %), `motionDetected`. The earlier `dht_valid` flag is
+  gone. A failed DHT22 read now skips the whole cycle (nothing is queued, the
+  reason is logged), so a consumer never receives a sample with invalid data.
+  The heartbeat LED still toggles every period.
+- **Unverified assumption, to be checked in Wokwi:** `lightPercentFromAdc()`
+  assumes the LDR module's AO voltage *falls* as light rises (raw 0 -> 100 %,
+  raw 4095 -> 0 %). If Wokwi shows the opposite (a brighter light giving a
+  lower percentage), change `darkness = kAdcMax - clamped` to
+  `darkness = clamped` in `src/sensors_logic.cpp` and swap the two endpoint
+  tests.

@@ -7,6 +7,7 @@
 #include "task.h"
 #include "dht22.h"
 #include "rtos_objects.h"
+#include "sensors_logic.h"
 #include "serial_log.h"
 #include "system_state.h"
 
@@ -49,26 +50,28 @@ void sensors_init(void) {
     dht22_init();
 }
 
+
 /* One sample per period. 2000 ms is also the DHT22's minimum read interval. */
 static constexpr uint32_t kSensorPeriodMs = 2000;
 static_assert(kSensorPeriodMs >= kDht22MinIntervalMs,
               "the DHT22 must not be read more often than every 2 s");
 
-/* Returns the LDR ADC value, or `previous` if the conversion times out. */
-static uint16_t read_ldr(uint16_t previous) {
-    uint16_t value = previous;
+/* Reads the LDR ADC. Returns false if the conversion times out. */
+static bool read_ldr(uint16_t *raw) {
+    bool ok = false;
 
     HAL_ADC_Start(&hadc1);
     if (HAL_ADC_PollForConversion(&hadc1, 10) == HAL_OK) {
-        value = (uint16_t)HAL_ADC_GetValue(&hadc1);
+        *raw = (uint16_t)HAL_ADC_GetValue(&hadc1);
+        ok = true;
     }
     HAL_ADC_Stop(&hadc1);
-    return value;
+    return ok;
 }
 
 void SensorTask(void *pvParameters) {
-    SensorData_t sample = {0.0f, 0.0f, 0, false};
-    char line[80];
+    SensorData sample = {0.0f, 0.0f, 0, false};
+    char line[96];
     char temperature[12];
     char humidity[12];
 
@@ -81,30 +84,38 @@ void SensorTask(void *pvParameters) {
     for (;;) {
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(kSensorPeriodMs));
 
-        /* dht22_read writes `reading` only on success, so a failed read leaves
-         * the previous temperature/humidity in `sample`, flagged invalid. */
+        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);   /* heartbeat, every period */
+
+        /* A failed DHT22 read skips this cycle: nothing is sent, so the
+         * consumers keep their previous sample and never see a bad value. */
         Dht22Reading reading;
         Dht22Status status = dht22_read(&reading);
-        sample.dht_valid = (status == DHT22_OK);
-        if (sample.dht_valid) {
-            sample.temperature = reading.temperature_tenths / 10.0f;
-            sample.humidity = reading.humidity_tenths / 10.0f;
+        if (status != DHT22_OK) {
+            snprintf(line, sizeof(line), "DHT22: read failed (%s), sample skipped",
+                     dht22_status_name(status));
+            log_line(line);
+            continue;
         }
-        sample.light_level = read_ldr(sample.light_level);
 
-        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+        sample.temperature = reading.temperature_tenths / 10.0f;
+        sample.humidity = reading.humidity_tenths / 10.0f;
+
+        uint16_t raw = 0;
+        if (read_ldr(&raw)) {
+            sample.lightLevel = lightPercentFromAdc(raw);
+        }   /* else keep the previous light level */
+
+        sample.motionDetected = (xEventGroupGetBits(xSystemEvents) & EVENT_MOTION) != 0;
+
         xQueueOverwrite(xDisplayQueue, &sample);
         xQueueOverwrite(xAlarmQueue, &sample);
 
-        if (sample.dht_valid) {
-            format_tenths_2dp(temperature, sizeof(temperature), reading.temperature_tenths);
-            format_tenths_2dp(humidity, sizeof(humidity), reading.humidity_tenths);
-            snprintf(line, sizeof(line), "Sample: Temperature: %s C, Humidity: %s %%, Light: %u",
-                     temperature, humidity, sample.light_level);
-        } else {
-            snprintf(line, sizeof(line), "DHT22: read failed (%s), Light: %u",
-                     dht22_status_name(status), sample.light_level);
-        }
+        format_tenths_2dp(temperature, sizeof(temperature), reading.temperature_tenths);
+        format_tenths_2dp(humidity, sizeof(humidity), reading.humidity_tenths);
+        snprintf(line, sizeof(line),
+                 "Sample: Temperature: %s C, Humidity: %s %%, Light: %d %%, Motion: %s",
+                 temperature, humidity, sample.lightLevel,
+                 sample.motionDetected ? "yes" : "no");
         log_line(line);
     }
 }

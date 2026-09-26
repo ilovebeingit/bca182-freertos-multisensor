@@ -11,8 +11,8 @@ SemaphoreHandle_t serialMutex = NULL;
 EventGroupHandle_t xSystemEvents = NULL;
 
 bool rtos_objects_create(void) {
-    xDisplayQueue = xQueueCreate(1, sizeof(SensorData_t));
-    xAlarmQueue = xQueueCreate(1, sizeof(SensorData_t));
+    xDisplayQueue = xQueueCreate(1, sizeof(SensorData));
+    xAlarmQueue = xQueueCreate(1, sizeof(SensorData));
     xModeQueue = xQueueCreate(1, sizeof(DisplayMode));
     serialMutex = xSemaphoreCreateMutex();
     xSystemEvents = xEventGroupCreate();

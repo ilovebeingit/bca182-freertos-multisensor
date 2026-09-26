@@ -204,24 +204,16 @@ static void format_tenths_1dp(char *buf, uint16_t size, int32_t tenths, const ch
 }
 
 void display_format_value(char *buf, uint16_t size, DisplayMode mode,
-                          const SensorData_t *sample, bool motion_detected) {
+                          const SensorData *sample, bool motion_detected) {
     switch (mode) {
         case DisplayMode::TEMPERATURE:
-            if (sample->dht_valid) {
-                format_tenths_1dp(buf, size, to_tenths(sample->temperature), "C");
-            } else {
-                snprintf(buf, size, "--.- C");
-            }
+            format_tenths_1dp(buf, size, to_tenths(sample->temperature), "C");
             return;
         case DisplayMode::HUMIDITY:
-            if (sample->dht_valid) {
-                format_tenths_1dp(buf, size, to_tenths(sample->humidity), "%");
-            } else {
-                snprintf(buf, size, "--.- %%");
-            }
+            format_tenths_1dp(buf, size, to_tenths(sample->humidity), "%");
             return;
         case DisplayMode::LIGHT:
-            snprintf(buf, size, "%u", sample->light_level);
+            snprintf(buf, size, "%d %%", sample->lightLevel);
             return;
         case DisplayMode::MOTION:
             snprintf(buf, size, "%s", motion_detected ? "DETECTED" : "CLEAR");
@@ -237,7 +229,7 @@ static void draw_centered(uint8_t *fb, int16_t y, const char *str, uint8_t scale
 }
 
 void display_render_screen(uint8_t *fb, DisplayMode mode,
-                           const SensorData_t *sample, bool motion_detected) {
+                           const SensorData *sample, bool motion_detected) {
     char value[16];
 
     display_clear(fb);

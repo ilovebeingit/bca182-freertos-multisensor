@@ -22,7 +22,7 @@ void alarm_init(void) {
 
 void AlarmTask(void *pvParameters) {
     bool prev_sounding = false;
-    SensorData_t latest = {0.0f, 0.0f, 0, false};
+    SensorData latest = {0.0f, 0.0f, 0, false};
 
     log_line("AlarmTask started");
 

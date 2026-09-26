@@ -102,7 +102,7 @@ static constexpr uint32_t kEventPollMs = 250;
 
 void DisplayTask(void *pvParameters) {
     DisplayMode mode = kInitialDisplayMode;
-    SensorData_t sample = {0.0f, 0.0f, 0, false};
+    SensorData sample = {0.0f, 0.0f, 0, false};
     bool have_sample = false;
     bool motion = false;
 

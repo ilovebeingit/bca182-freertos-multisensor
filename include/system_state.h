@@ -3,12 +3,12 @@
 /* Shared application state. Hardware-independent: no HAL or FreeRTOS headers,
  * so it can be compiled for platform=native unit tests. */
 
-#include <stdint.h>
-
-/* One SensorTask sample, sent by value through xDisplayQueue and xAlarmQueue. */
-typedef struct {
-    float temperature;      /* degC; meaningful only when dht_valid */
-    float humidity;         /* %RH;  meaningful only when dht_valid */
-    uint16_t light_level;   /* raw 12-bit LDR ADC value */
-    bool dht_valid;         /* true only if this sample's DHT22 read succeeded */
-} SensorData_t;
+/* One SensorTask sample (CLAUDE.md), sent by value through xDisplayQueue and
+ * xAlarmQueue. SensorTask only sends a sample after a successful DHT22 read,
+ * so temperature and humidity are always real measurements. */
+struct SensorData {
+    float temperature;      /* degC */
+    float humidity;         /* %RH */
+    int lightLevel;         /* relative ambient light, 0-100 % (not lux) */
+    bool motionDetected;    /* EVENT_MOTION when the sample was taken */
+};
