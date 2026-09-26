@@ -96,10 +96,15 @@ void display_init(void) {
     HAL_I2C_Init(&hi2c1);
 }
 
+/* Event-group bits can't join a queue set, so the set wait times out this
+ * often to notice EVENT_MOTION changes for the MOTION screen. */
+static constexpr uint32_t kEventPollMs = 250;
+
 void DisplayTask(void *pvParameters) {
     DisplayMode mode = kInitialDisplayMode;
     SensorData_t sample = {0.0f, 0.0f, 0, false};
     bool have_sample = false;
+    bool motion = false;
 
     log_line("DisplayTask started");
     ssd1306_init();
@@ -107,22 +112,34 @@ void DisplayTask(void *pvParameters) {
 
     for (;;) {
         /* Blocks until xDisplayQueue (new sample, every 2 s) or xModeQueue
-         * (encoder turned) has an item, and returns which one. Each set event
-         * corresponds to exactly one queued item, so the 0-timeout receive
-         * below always succeeds. */
-        QueueSetMemberHandle_t ready = xQueueSelectFromSet(xDisplayEvents, portMAX_DELAY);
+         * (encoder turned) has an item and returns which one, or returns NULL
+         * after kEventPollMs. Each set event corresponds to exactly one queued
+         * item, so the 0-timeout receive below always succeeds. */
+        QueueSetMemberHandle_t ready =
+            xQueueSelectFromSet(xDisplayEvents, pdMS_TO_TICKS(kEventPollMs));
+        bool changed = false;
 
         if (ready == xDisplayQueue) {
             if (xQueueReceive(xDisplayQueue, &sample, 0) == pdTRUE) {
                 have_sample = true;
+                changed = true;
             }
         } else if (ready == xModeQueue) {
-            xQueueReceive(xModeQueue, &mode, 0);
+            if (xQueueReceive(xModeQueue, &mode, 0) == pdTRUE) {
+                changed = true;
+            }
         }
 
-        /* Until the first sample arrives there is nothing real to show. */
-        if (have_sample) {
-            display_render_screen(s_frame, mode, &sample, g_motion_flag != 0);
+        bool now_motion = (xEventGroupGetBits(xSystemEvents) & EVENT_MOTION) != 0;
+        if (now_motion != motion) {
+            motion = now_motion;
+            changed = true;
+        }
+
+        /* Redraw only when something shown may have changed, and not before
+         * the first sample, when there is nothing real to show. */
+        if (have_sample && changed) {
+            display_render_screen(s_frame, mode, &sample, motion);
             ssd1306_flush();
         }
     }

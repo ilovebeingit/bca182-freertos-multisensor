@@ -4,8 +4,10 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "motion_logic.h"
+#include "rtos_objects.h"
 #include "serial_log.h"
-#include "system_state.h"
+
+static constexpr uint32_t kMotionPeriodMs = 100;
 
 void motion_init(void) {
     __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -24,14 +26,24 @@ void MotionTask(void *pvParameters) {
 
     log_line("MotionTask started");
 
+    TickType_t last_wake = xTaskGetTickCount();
+
     for (;;) {
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(kMotionPeriodMs));
+
         bool out = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_2) == GPIO_PIN_SET;
         bool detected = pir_motion_detected(out);
-        g_motion_flag = detected ? 1 : 0;
+
+        /* EVENT_MOTION mirrors the PIR level; only this task writes it. */
+        if (detected) {
+            xEventGroupSetBits(xSystemEvents, EVENT_MOTION);
+        } else {
+            xEventGroupClearBits(xSystemEvents, EVENT_MOTION);
+        }
+
         if (detected != prev_detected) {
             log_line(detected ? "MOTION: detected" : "MOTION: clear");
         }
         prev_detected = detected;
-        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

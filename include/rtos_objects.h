@@ -1,8 +1,19 @@
 #pragma once
 
 #include "FreeRTOS.h"
+#include "event_groups.h"
 #include "queue.h"
 #include "semphr.h"
+
+/* xSystemEvents: system-wide status flags, one bit each.
+ *   EVENT_ACTIVE  system is ACTIVE (set at boot; the state machine will own it)
+ *   EVENT_MOTION  PIR currently reports motion. MotionTask sets and clears it
+ *                 every 100 ms; readers only look.
+ *   EVENT_ALARM   temperature alarm is sounding (reserved for AlarmTask). */
+constexpr EventBits_t EVENT_ACTIVE = (1U << 0);
+constexpr EventBits_t EVENT_MOTION = (1U << 1);
+constexpr EventBits_t EVENT_ALARM  = (1U << 2);
+extern EventGroupHandle_t xSystemEvents;
 
 /* Latest SensorData_t sample, one queue per consumer, each of length 1:
  * SensorTask overwrites both every period, each consumer receives from its

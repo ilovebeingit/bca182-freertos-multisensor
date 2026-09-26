@@ -4,5 +4,6 @@
 
 void motion_init(void);
 
-/* Samples the PIR every 100 ms into g_motion_flag. */
+/* Every 100 ms (vTaskDelayUntil): samples the PIR and sets or clears
+ * EVENT_MOTION in xSystemEvents to match it. */
 void MotionTask(void *pvParameters);

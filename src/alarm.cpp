@@ -33,7 +33,8 @@ void AlarmTask(void *pvParameters) {
          * still follows motion only. */
         xQueueReceive(xAlarmQueue, &latest, 0);
 
-        bool sounding = alarm_should_sound(g_motion_flag);
+        bool motion = (xEventGroupGetBits(xSystemEvents) & EVENT_MOTION) != 0;
+        bool sounding = alarm_should_sound(motion ? 1 : 0);
         if (sounding != prev_sounding) {
             log_line(sounding ? "ALARM: buzzer on" : "ALARM: buzzer off");
         }

@@ -12,7 +12,3 @@ typedef struct {
     uint16_t light_level;   /* raw 12-bit LDR ADC value */
     bool dht_valid;         /* true only if this sample's DHT22 read succeeded */
 } SensorData_t;
-
-/* Motion state (not a sensor sample): written by MotionTask, read by
- * AlarmTask and DisplayTask. */
-extern volatile uint8_t g_motion_flag;

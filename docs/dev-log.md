@@ -140,3 +140,11 @@ snapshot showed SysTick still counting with PRIMASK reading 1.
 
 ### Still open
 - Real hardware has not been tested.
+
+## 2026-09-26: event groups are not built by default
+
+Adding `xSystemEvents` needs FreeRTOS's `event_groups.c`, but the
+STM32Cube Middleware-FreeRTOS library's build script compiles only the core
+kernel files unless optional features are requested. Fix: add
+`custom_freertos_features = event_groups` to `[env:bluepill_f103c8]` in
+`platformio.ini`. Without it, every `xEventGroup*` call fails to link.
