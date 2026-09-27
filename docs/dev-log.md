@@ -153,12 +153,12 @@ kernel files unless optional features are requested. Fix: add
   gone. A failed DHT22 read now skips the whole cycle (nothing is queued, the
   reason is logged), so a consumer never receives a sample with invalid data.
   The heartbeat LED still toggles every period.
-- **Unverified assumption, to be checked in Wokwi:** `lightPercentFromAdc()`
-  assumes the LDR module's AO voltage *falls* as light rises (raw 0 -> 100 %,
-  raw 4095 -> 0 %). If Wokwi shows the opposite (a brighter light giving a
-  lower percentage), change `darkness = kAdcMax - clamped` to
-  `darkness = clamped` in `src/sensors_logic.cpp` and swap the two endpoint
-  tests.
+- **Assumption, verified correct in Wokwi on 2026-09-27 (FT-03):**
+  `lightPercentFromAdc()` assumes the LDR module's AO voltage *falls* as light
+  rises (raw 0 -> 100 %, raw 4095 -> 0 %). In the simulation, bright gave 99 %
+  and dark 1 %, so the direction is right and no change is needed. (Had it
+  been reversed, the fix would have been `darkness = clamped` in
+  `src/sensors_logic.cpp`, plus swapping the two endpoint tests.)
 
 ## 2026-09-26: the MCU runs at 8 MHz, not 72 MHz
 
@@ -286,8 +286,9 @@ corrupted.
 ### Still open
 - Real hardware has not been tested. The port is also correct there, but the
   stock port is simpler and should be used on a real board.
-- Encoder, PIR and alarm behaviour are still to be exercised and recorded in
-  the simulation.
+- ~~Encoder, PIR and alarm behaviour are still to be exercised and recorded
+  in the simulation.~~ Done on 2026-09-27: all functional tests and fault
+  experiments passed in Wokwi (see `docs/test-plan.md`).
 
 ## 2026-09-27: SensorTask stuck in snprintf (inferred: IT-block state lost on interrupt)
 
