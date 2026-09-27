@@ -44,7 +44,7 @@ the expected behaviour, note it and add it to `docs/dev-log.md`.
    trigger the PIR before starting a test, and again whenever the log shows
    `STATE: INACTIVE`.
 5. Record the firmware commit you tested (`git log --oneline -1`):
-   `_______`
+   `de3a490` (all tests in this plan)
 
 ## B-01: boot sequence
 
