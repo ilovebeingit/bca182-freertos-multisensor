@@ -288,3 +288,99 @@ corrupted.
   stock port is simpler and should be used on a real board.
 - Encoder, PIR and alarm behaviour are still to be exercised and recorded in
   the simulation.
+
+## 2026-09-27: SensorTask stuck in snprintf (inferred: IT-block state lost on interrupt)
+
+> **Status: observed once, root cause inferred but not confirmed via probe,
+> due to time constraints.** The evidence below is from a single GDB snapshot.
+> The confirming experiment (a probe build that checks the results of
+> IT-conditional instructions while SysTick interrupts them) was not run.
+
+### Symptom
+Seen while running a temporary, uncommitted debug build (redraw and I2C
+logging in DisplayTask, DisplayTask stack raised to 384 words). The build was
+for the "OLED does not refresh on new samples" investigation. The terminal
+showed the normal boot, then one `DHT22: read failed (checksum mismatch),
+sample skipped`, then **no further SensorTask output at all**: no `Sample:`
+lines and no further read failures. This held while the system was ACTIVE
+(from boot to the 15 s timeout, and again after `STATE: ACTIVE (motion)`).
+MotionTask, InputTask and StateTask kept logging normally.
+
+### GDB evidence (Wokwi GDB server, firmware.elf of that build)
+- The CPU was executing **in SensorTask, inside `snprintf`**; SP 0x20000980
+  lies in SensorTask's stack:
+  ```
+  #0 __ssputs_r  #1 _printf_common  #2 _printf_i  #3 _svfprintf_r
+  #4 snprintf    #5 format_tenths_2dp  #6 SensorTask
+  ```
+  `format_tenths_2dp` is only called after a *successful* DHT22 read, after
+  the sample has been written to both queues ([sensors.cpp](../src/sensors.cpp)).
+- `_printf_common` was in its padding loop, which writes one padding
+  character per pass until R9 equals R5:
+  ```
+  8004692  cmp   r5, r9
+  8004694  bne.n 80046cc
+  ...
+  80046cc  movs  r3, #1           ; write 1 pad char via __ssputs_r
+  80046d4  blx   r8
+  80046da  add.w r9, r9, #1
+  80046de  b.n   8004692
+  ```
+  **R5 = 0xFFFFFFFE (-2)**, with R9 saved as 0x00A091D0 (about 10.5 million
+  passes done out of about 4.29 billion). At roughly 100 cycles per pass at
+  8 MHz, that is about 130 s, which matches a stall since about 4 s.
+  The output buffer was full (`_w` = 0, `_p` at the end of the 11-byte
+  space), so the extra characters were being discarded.
+- The format is `"%s%lu.%lu0"`, which has no width or padding. The
+  conversion's fields in memory (flags 0x80, precision -1, size 1) give a pad
+  count of **0**, so the loop should never have been entered.
+- R5 is computed just before the loop:
+  ```
+  8004666  ldr   r5, [r4, #12]    ; width
+  800466c  cmp   r3, #4           ; (flags & 6) == 4 ?  -> false here
+  800466e  it    ne
+  8004670  movne r5, #0           ; executes: r5 = 0
+  8004672  ldr.w r2, [r9]         ; r2 = realsz (digits printed)
+  8004676  mov.w r9, #0
+  800467a  it    eq
+  800467c  subeq r5, r5, r2       ; condition false: must be skipped
+  800467e  ldr   r3, [r4, #8]
+  8004680  ldr   r2, [r4, #16]
+  8004682  it    eq
+  8004684  biceq.w r5, r5, r5, asr #31   ; clamps a negative r5 to 0 (skipped)
+  8004688  cmp   r3, r2           ; precision -1 > size 1 ? no
+  ```
+  Executed correctly, R5 ends at 0. The instruction encodings can't produce
+  -2 from these memory values.
+
+### The R5 = -2 fingerprint
+If `subeq` at 0x800467C **executed even though its condition was false**,
+R5 = 0 - realsz. For the default 24.0 °C, `%lu` of 24 prints "24", so
+realsz = 2 and R5 = **-2**, exactly the value observed. (realsz was inferred
+from the temperature; it was not read from memory.) The next `it eq` /
+`biceq` pair starts a new IT block and is correctly skipped, so the -2 is not
+clamped.
+
+### Hypothesis (not confirmed)
+A SysTick exception was taken between `it eq` and `subeq`, and on return the
+**IT-block execution state (ITSTATE, held in the xPSR) was lost**. The 16-bit
+encoding of `subeq` (0x1AAD) then ran as an unconditional `subs`. On real
+Cortex-M3 hardware, ITSTATE is saved in the stacked xPSR and restored on
+exception return. This project's port never writes a task's stacked xPSR
+after creating the task, so the suspected cause is the Wokwi emulator not
+saving or restoring ITSTATE across exceptions. That would be another
+deviation alongside those listed under "Wokwi deviations from ARMv7-M found".
+
+### Consequences if the hypothesis holds
+- Any task can be hit wherever the compiler emits an IT block, when an
+  interrupt lands inside it. The window is one instruction, so hits are rare
+  and depend on timing. The debug patch did not cause this; it only shifted
+  timing and memory layout.
+- A hit can produce wrong values silently or, as here, a practically endless
+  loop. SensorTask spinning at priority 2 also **starved DisplayTask
+  (priority 1) and the idle task**, so this run gave no display diagnostics.
+- Real hardware is not expected to be affected.
+
+### Not done
+- The probe build that would confirm or reject the hypothesis.
+- Any workaround in the firmware or port.
