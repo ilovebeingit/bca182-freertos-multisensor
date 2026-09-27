@@ -1,0 +1,40 @@
+%% Hardware architecture: STM32 Blue Pill, peripherals and pin connections.
+%% Source of truth: diagram.json (wiring) and the *_init() functions in src/.
+%% Every module is also powered from the Blue Pill's 3V3 and GND (not drawn).
+flowchart LR
+    subgraph IN["Inputs"]
+        direction TB
+        DHT["DHT22<br/>temperature + humidity"]
+        LDR["LDR module<br/>photoresistor, AO output"]
+        PIR["PIR motion sensor<br/>OUT"]
+        ENC["KY-040 rotary encoder<br/>CLK / DT / SW"]
+    end
+
+    subgraph MCU["STM32F103C8 Blue Pill (8 MHz HSI)"]
+        direction TB
+        PA0["PA0<br/>GPIO, bit-banged 1-wire"]
+        PA1["PA1<br/>ADC1_IN1"]
+        PA2["PA2<br/>GPIO input, no pull"]
+        PA345["PA3 / PA4 / PA5<br/>GPIO inputs, pull-up"]
+        PB67["PB6 SCL / PB7 SDA<br/>I2C1, 100 kHz"]
+        PA8["PA8<br/>TIM1_CH1 PWM, 1 kHz"]
+        PC13["PC13<br/>GPIO output"]
+        PA9["PA9 USART1 TX<br/>115200 8N1, transmit only"]
+    end
+
+    subgraph OUT["Outputs"]
+        direction TB
+        OLED["SSD1306 OLED<br/>128 x 64, I2C address 0x3C"]
+        BUZ["Buzzer"]
+        LED["On-board LED<br/>heartbeat, toggles every 2 s"]
+        SER["Wokwi Serial Monitor<br/>log output"]
+    end
+
+    DHT <-->|"SDA data"| PA0
+    LDR -->|"AO analog, 0-100 % relative light"| PA1
+    PIR -->|"OUT digital"| PA2
+    ENC -->|"CLK, DT, SW"| PA345
+    PB67 <-->|"SCL, SDA"| OLED
+    PA8 -->|"PWM drive"| BUZ
+    PC13 --> LED
+    PA9 -->|"serial log lines"| SER

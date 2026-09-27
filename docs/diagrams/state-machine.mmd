@@ -1,0 +1,31 @@
+%% ACTIVE / INACTIVE state machine (FR-08, FR-09, FR-10).
+%% Source of truth: evaluateSystemState() in src/system_state_logic.cpp and
+%% StateTask in src/system_state.cpp. StateTask owns EVENT_ACTIVE.
+stateDiagram-v2
+    direction TB
+
+    [*] --> ACTIVE : boot
+    ACTIVE --> INACTIVE : 15 s without motion
+    INACTIVE --> ACTIVE : motion (PIR)
+
+    note left of ACTIVE
+        EVENT_ACTIVE set
+        (at boot by rtos_objects_create,
+        on wake by StateTask)
+        Any motion restarts the 15 s count
+        OLED on, redrawn on sample or mode change
+        SensorTask samples every 2 s
+        Encoder changes the display mode
+        Buzzer sounds outside 18.0-30.0 C
+    end note
+
+    note right of INACTIVE
+        EVENT_ACTIVE cleared by StateTask
+        OLED blanked once, then no display work
+        No sampling, no Sample lines
+        Encoder ignored
+        Buzzer off within about 0.5 s
+        PIR still read every 100 ms
+        Heartbeat LED still toggles
+        StateTask waits for motion, no timeout
+    end note

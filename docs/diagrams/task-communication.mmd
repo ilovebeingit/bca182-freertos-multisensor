@@ -1,0 +1,45 @@
+%% Task communication: the six FreeRTOS tasks and the kernel objects between them.
+%% Source of truth: src/main.cpp (tasks, priorities), src/rtos_objects.cpp
+%% (objects), and each task's xQueue* / xEventGroup* / log_line calls.
+%% Solid arrows: data sent or bits written. Dotted arrows: bits read or waited on.
+flowchart TB
+    INPUT["InputTask<br/>prio 3, every 5 ms"]
+    SENSOR["SensorTask<br/>prio 2, every 2 s (vTaskDelayUntil)"]
+    MOTION["MotionTask<br/>prio 3, every 100 ms"]
+
+    QM[("xModeQueue<br/>1 x DisplayMode")]
+    QD[("xDisplayQueue<br/>1 x SensorData")]
+    QA[("xAlarmQueue<br/>1 x SensorData")]
+    EG{{"xSystemEvents (event group)<br/>BIT0 EVENT_ACTIVE<br/>BIT1 EVENT_MOTION<br/>BIT2 EVENT_ALARM"}}
+    SET{{"xDisplayEvents<br/>queue set"}}
+
+    DISPLAY["DisplayTask<br/>prio 1, queue set or 250 ms timeout"]
+    ALARM["AlarmTask<br/>prio 2, sample or 500 ms timeout"]
+    STATE["StateTask<br/>prio 2, EVENT_MOTION or 15 s timeout"]
+
+    MUTEX[["serialMutex<br/>taken by log_line() in all six tasks,<br/>one whole line at a time"]]
+    UART["USART1 TX<br/>Wokwi Serial Monitor"]
+
+    INPUT -->|"overwrite mode"| QM
+    SENSOR -->|"overwrite sample"| QD
+    SENSOR -->|"overwrite sample"| QA
+    MOTION -->|"set / clear MOTION"| EG
+
+    QM --> SET
+    QD --> SET
+    SET -->|"select, then receive"| DISPLAY
+    QA -->|"receive"| ALARM
+
+    STATE -->|"set / clear ACTIVE"| EG
+    ALARM -->|"set / clear ALARM"| EG
+
+    EG -.->|"waits on MOTION"| STATE
+    EG -.->|"reads ACTIVE, MOTION, ALARM"| DISPLAY
+    EG -.->|"reads ACTIVE"| ALARM
+    EG -.->|"reads ACTIVE, MOTION"| SENSOR
+    EG -.->|"reads ACTIVE"| INPUT
+
+    MUTEX --> UART
+
+    %% Layout only (invisible): keeps the mutex below the tasks.
+    DISPLAY ~~~ MUTEX
