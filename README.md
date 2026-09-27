@@ -298,10 +298,14 @@ System starting...
 
 ## Running the Wokwi Simulation
 
-> **PLACEHOLDER: to be completed after the simulation has been run.**
-> This section will cover starting the simulation from VS Code, the expected
-> serial output, and how to use the encoder, PIR and DHT22 controls, with
-> screenshots.
+![Wokwi circuit: STM32 Blue Pill wired to the SSD1306 OLED, KY-040 encoder, buzzer, DHT22, LDR module and PIR sensor](docs/screenshots/wokwi-circuit.png)
+
+*The full circuit in Wokwi, as defined in [`diagram.json`](diagram.json). The
+OLED is showing the TEMPERATURE screen.*
+
+> **PLACEHOLDER: still to be written.** Starting the simulation from VS Code,
+> the expected serial output, and how to use the encoder, PIR and DHT22
+> controls.
 
 The FreeRTOS scheduler runs correctly in Wokwi under the project's custom
 port. In the Wokwi terminal, all six tasks start, SensorTask logs a sample
