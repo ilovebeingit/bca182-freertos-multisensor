@@ -67,6 +67,11 @@ This project demonstrates:
 
 ## System Architecture
 
+![Hardware architecture: the STM32 Blue Pill with its inputs (DHT22, LDR module, PIR, KY-040 encoder) and outputs (SSD1306 OLED, buzzer, heartbeat LED, serial monitor), each labelled with its pin and peripheral](docs/diagrams/architecture.png)
+
+*Hardware architecture: each peripheral and the pin and MCU peripheral it
+uses. Source: [`docs/diagrams/architecture.mmd`](docs/diagrams/architecture.mmd).*
+
 The firmware has three layers:
 
 | Layer | Contents |
@@ -173,6 +178,11 @@ struct SensorData { float temperature; float humidity; int lightLevel; bool moti
 
 ## Inter-Task Communication
 
+![Task communication: SensorTask overwrites xDisplayQueue and xAlarmQueue, InputTask overwrites xModeQueue, DisplayTask waits on the xDisplayEvents queue set, AlarmTask receives from xAlarmQueue, and MotionTask, StateTask and AlarmTask write the xSystemEvents bits that the other tasks read; all tasks log through serialMutex](docs/diagrams/task-communication.png)
+
+*Solid arrows: data sent or bits written. Dotted arrows: bits read or waited
+on. Source: [`docs/diagrams/task-communication.mmd`](docs/diagrams/task-communication.mmd).*
+
 | Object | Type | Producer | Consumer | Purpose |
 |---|---|---|---|---|
 | `xDisplayQueue` | queue, 1 x `SensorData` | SensorTask | DisplayTask | Latest sample for the OLED |
@@ -203,6 +213,10 @@ Every object is documented in
 sets and clears it, and why it exists.
 
 ## State Machine
+
+![State machine: the system boots ACTIVE, goes INACTIVE after 15 s without motion, and returns to ACTIVE on PIR motion, with notes on what each state does](docs/diagrams/state-machine.png)
+
+*Source: [`docs/diagrams/state-machine.mmd`](docs/diagrams/state-machine.mmd).*
 
 | From | Condition | To | Effect |
 |---|---|---|---|
@@ -249,9 +263,13 @@ supplies its inputs by waiting on `EVENT_MOTION` for the time remaining in the
 │                           switching, SysTick-gated critical sections
 ├── test/                   Unity tests (alarm, light level, navigation, state)
 ├── docs/
+│   ├── requirements.md     Functional requirements FR-01..FR-10 and constraints
 │   ├── design-notes.md     Tasks and every RTOS object: roles and rationale
+│   ├── test-plan.md        Functional tests and fault experiments, with results
 │   ├── static-analysis.md  Every cppcheck finding with cause and resolution
-│   └── dev-log.md          Problems hit and how they were solved
+│   ├── dev-log.md          Problems hit and how they were solved
+│   ├── diagrams/           Mermaid sources (.mmd) and rendered PNGs
+│   └── screenshots/        Wokwi screenshots
 ├── scripts/                Build helper for the native test toolchain
 ├── diagram.json            Wokwi circuit
 ├── wokwi.toml              Wokwi firmware / GDB settings
@@ -421,19 +439,46 @@ Every finding, with file, line, cause and resolution, is listed in
 
 ## Functional Verification
 
-> **PLACEHOLDER: results to be recorded from simulation or hardware runs.**
-> Planned checks, one per functional requirement:
->
-> | Requirement | What to verify | Result |
-> |---|---|---|
-> | FR-01 / FR-02 | Temperature and humidity logged every 2 s and shown on the OLED | *pending* |
-> | FR-03 | Light level shown as 0-100 % and follows the LDR control | *pending* |
-> | FR-04 | PIR motion reflected on the MOTION screen and in the log | *pending* |
-> | FR-05 | OLED shows exactly one measurement | *pending* |
-> | FR-06 | Encoder cycles the modes in both directions with wraparound | *pending* |
-> | FR-07 | Buzzer (about 1 kHz) sounds below 18.0 °C and above 30.0 °C only | *pending* |
-> | FR-08 / FR-09 | INACTIVE after 15 s without motion: OLED blank, no sensing | *pending* |
-> | FR-10 | Motion returns the system to ACTIVE | *pending* |
+Every functional requirement was tested in the Wokwi simulation on
+2026-09-27, against firmware commit `1e12dc8`. There is one functional test
+per requirement, plus a boot check and three fault experiments. All 14
+passed. The steps, expected output and observations for each are in
+[`docs/test-plan.md`](docs/test-plan.md).
+
+![Live Wokwi alarm test: the OLED shows ALARM HIGH, TEMPERATURE, 37.3 C, and the serial terminal below shows ALARM: temperature HIGH, a 37.30 C sample and ALARM: buzzer on](docs/screenshots/simulation-running.png)
+
+*A live alarm test in Wokwi with the DHT22 set to 37.3 °C. The OLED shows
+`ALARM HIGH` / `TEMPERATURE` / `37.3 C`. The terminal shows
+`ALARM: temperature HIGH`, the `Sample: Temperature: 37.30 C` line and
+`ALARM: buzzer on`. The alarm line can come before the sample line because
+SensorTask queues each sample before logging it.*
+
+| Test | Verifies | Observed | Result |
+|---|---|---|---|
+| B-01 | Boot | Banner, timer setup line, all six tasks started, OLED initialised | PASS |
+| FT-01 | FR-01 temperature | DHT22 set to 11.80 °C: the OLED updated on its own to `11.8 C`, matching the log | PASS |
+| FT-02 | FR-02 humidity | Humidity set to 21.00 %: the OLED showed `21.0 %`, matching the log | PASS |
+| FT-03 | FR-03 light | Bright 99 %, dark 1 %: the direction is correct | PASS |
+| FT-04 | FR-04 motion | OLED `DETECTED` / `CLEAR`, matching `MOTION: detected` / `MOTION: clear` | PASS |
+| FT-05 | FR-05 one measurement | Always one label and one value on the OLED | PASS |
+| FT-06 | FR-06 encoder | Full cycle with wraparound; the OLED matched every step; button presses logged | PASS |
+| FT-07 | FR-07 alarm | 80 °C: `ALARM HIGH`, buzzer on. 11.8 °C: `ALARM LOW` | PASS |
+| FT-08 | FR-08 states | Steady 2 s sampling while ACTIVE; sampling stopped at INACTIVE | PASS |
+| FT-09 | FR-09 timeout | INACTIVE after 15 s without motion, several times | PASS |
+| FT-10 | FR-10 wake | `STATE: ACTIVE (motion)` on motion; the OLED and sampling resumed | PASS |
+| F-1 | DHT22 disconnected | `read failed (no response)` every 2 s; the other tasks unaffected; OLED blank | PASS |
+| F-2 | OLED disconnected | Sampling and logging carried on at the normal pace; the failure is silent (I2C results are not checked) | PASS |
+| F-3 | Alarm while INACTIVE | Buzzer off at INACTIVE; on wake it sounded for about 1 s on the stale reading until the next sample | PASS |
+
+The exact 18.0 / 30.0 °C alarm boundaries were not stepped through in the
+simulation. They are covered by the unit tests (see
+[Unit Testing](#unit-testing)).
+
+**Known open issue:** in one run of a temporary debug build, SensorTask
+stalled inside `snprintf`. The GDB evidence points to Wokwi losing the
+IT-block execution state when an interrupt lands inside an IT block. This was
+observed once and the cause is inferred but not confirmed; see the 2026-09-27
+entry in [`docs/dev-log.md`](docs/dev-log.md).
 
 ## Engineering Decisions
 
