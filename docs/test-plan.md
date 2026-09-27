@@ -1,11 +1,12 @@
 # Test plan: functional tests and fault experiments
 
 How to verify the firmware in the Wokwi simulation, and where to record the
-results. There is one functional test per requirement in `CLAUDE.md`
-(FT-01..FT-10 correspond to FR-01..FR-10), plus a boot check and three fault
-experiments. The FT and F numbering is this project's own.
+results. There is one functional test per requirement in
+[`requirements.md`](requirements.md) (FT-01..FT-10 correspond to
+FR-01..FR-10), plus a boot check and three fault experiments. The FT and F
+numbering is this project's own.
 
-Record only what you actually observe (CLAUDE.md: never invent test results).
+Record only what you actually observe; never invent test results.
 For each test, fill in the Result block with PASS, FAIL or PARTIAL, what you
 saw (log lines, OLED text, timings), and the date. If a result differs from
 the expected behaviour, note it and add it to `docs/dev-log.md`.

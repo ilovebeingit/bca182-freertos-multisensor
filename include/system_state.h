@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 
-/* One SensorTask sample (CLAUDE.md), sent by value through xDisplayQueue and
+/* One SensorTask sample (docs/requirements.md), sent by value through xDisplayQueue and
  * xAlarmQueue. SensorTask only sends a sample after a successful DHT22 read,
  * so temperature and humidity are always real measurements. */
 struct SensorData {

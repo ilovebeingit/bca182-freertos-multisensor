@@ -148,7 +148,7 @@ kernel files unless optional features are requested. Fix: add
 
 ## 2026-09-26: SensorData brought in line with the specification
 
-- `SensorData` now matches CLAUDE.md exactly: `temperature`, `humidity`,
+- `SensorData` now matches the specification (`docs/requirements.md`) exactly: `temperature`, `humidity`,
   `int lightLevel` (0-100 %), `motionDetected`. The earlier `dht_valid` flag is
   gone. A failed DHT22 read now skips the whole cycle (nothing is queued, the
   reason is logged), so a consumer never receives a sample with invalid data.

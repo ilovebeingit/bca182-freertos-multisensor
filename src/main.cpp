@@ -37,7 +37,7 @@ int main(void) {
     for (;;) {}
 }
 
-/* Application entry (CLAUDE.md): hardware init -> RTOS objects -> tasks ->
+/* Application entry (docs/requirements.md): hardware init -> RTOS objects -> tasks ->
  * scheduler. Does not return once the scheduler is running. */
 void app_main(void) {
     serial_log_init();

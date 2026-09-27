@@ -38,8 +38,8 @@ consumer only ever needs the newest value, and a producer never blocks.
 - **Consumer:** AlarmTask (`xQueueReceive`, 500 ms timeout).
 - **Why a second queue:** a queue item is removed by the task that receives it.
   With one queue shared by DisplayTask and AlarmTask, whichever received first
-  would take the sample, and the other would miss it (CLAUDE.md: one queue per
-  consumer).
+  would take the sample, and the other would miss it (`docs/requirements.md`:
+  one queue per consumer).
 
 ### `xModeQueue` (1 x `DisplayMode`)
 - **Producer:** InputTask, when the encoder steps while ACTIVE.

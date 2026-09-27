@@ -3,3 +3,6 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# AI coding-assistant instructions (kept local, not published)
+CLAUDE.md

@@ -111,7 +111,9 @@ startup failure is logged as a `FATAL:` line.
 
 ## Hardware / Simulated Components
 
-The circuit is defined in [`diagram.json`](diagram.json) for Wokwi.
+The circuit is defined in [`diagram.json`](diagram.json) for Wokwi. The
+FR-01..FR-10 IDs below refer to the functional requirements in
+[`docs/requirements.md`](docs/requirements.md).
 
 | Component | Part | Role |
 |---|---|---|
