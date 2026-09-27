@@ -289,13 +289,6 @@ loads through `wokwi.toml`. The build finishes with no compiler warnings. At
 the time of writing it uses about 20 KB of flash (31 %) and 12 KB of RAM
 (59 %), including the 10 KB FreeRTOS heap.
 
-On startup the firmware prints:
-
-```
-BCA182 FreeRTOS Multisensor
-System starting...
-```
-
 ## Running the Wokwi Simulation
 
 ![Wokwi circuit: STM32 Blue Pill wired to the SSD1306 OLED, KY-040 encoder, buzzer, DHT22, LDR module and PIR sensor](docs/screenshots/wokwi-circuit.png)
@@ -303,14 +296,79 @@ System starting...
 *The full circuit in Wokwi, as defined in [`diagram.json`](diagram.json). The
 OLED is showing the TEMPERATURE screen.*
 
-> **PLACEHOLDER: still to be written.** Starting the simulation from VS Code,
-> the expected serial output, and how to use the encoder, PIR and DHT22
-> controls.
+### Starting the simulation
+
+1. Build the firmware with `pio run` (see [Building the Project](#building-the-project)).
+   Wokwi loads the built `firmware.bin` and `firmware.elf` through
+   `wokwi.toml`, so rebuild after every code change.
+2. In VS Code, press **F1** and run **"Wokwi: Start Simulator"**. The circuit
+   from `diagram.json` opens in a new tab.
+3. Keep the **Wokwi Terminal** (the serial log) and the circuit view both
+   visible. Most of the system's behaviour shows up in the log.
+
+### Expected serial output
+
+On startup the terminal shows:
+
+```
+BCA182 FreeRTOS Multisensor
+System starting...
+ALARM: TIM1 clock 8000000 Hz, PSC=7, ARR=999 -> 1000 Hz PWM
+MotionTask started
+InputTask started
+SensorTask started
+AlarmTask started
+StateTask started
+DisplayTask started
+DISPLAY: OLED initialised
+```
+
+The six tasks start once the scheduler runs. The order above is the one
+observed, but it isn't guaranteed. About 2 s later SensorTask logs its first
+sample, then one every 2 s:
+
+```
+Sample: Temperature: 24.00 C, Humidity: 40.00 %, Light: 76 %, Motion: no
+```
+
+The values depend on the part controls. The other messages appear as the
+system reacts:
+
+| Message | Meaning |
+|---|---|
+| `MOTION: detected` / `MOTION: clear` | The PIR output went high / low |
+| `STATE: INACTIVE (no motion for 15 s)` | No motion for 15 s: OLED blanked, sensing and encoder paused |
+| `STATE: ACTIVE (motion)` | Motion woke the system |
+| `INPUT: mode TEMPERATURE` (or `HUMIDITY`, `LIGHT`, `MOTION`) | The encoder changed the OLED screen |
+| `INPUT: button pressed` | The encoder knob was pressed |
+| `ALARM: temperature LOW` / `HIGH` / `NORMAL` | The temperature moved below / above / back inside 18.0-30.0 °C |
+| `ALARM: buzzer on` / `ALARM: buzzer off` | The buzzer started / stopped |
+| `DHT22: read failed (<reason>), sample skipped` | A DHT22 read failed (for example `no response` or `checksum mismatch`); that 2 s sample is skipped |
+
+### Using the controls
+
+- **DHT22:** click the sensor to open its temperature and humidity sliders.
+  A new value appears in the next sample, within 2 s. A temperature below
+  18.0 °C or above 30.0 °C sounds the buzzer and shows `ALARM LOW` or
+  `ALARM HIGH` on the OLED.
+- **Light sensor:** click the photoresistor module to open its light slider.
+  The firmware reports light as 0-100 % relative level, not lux: brighter
+  gives a higher percentage.
+- **PIR:** click the sensor, then click **Simulate Motion** in the popup. The
+  output stays high for 5 s (Wokwi's default), then `MOTION: clear` follows.
+- **Rotary encoder:** click the arrows on the KY-040 to turn it clockwise
+  (next screen: TEMPERATURE → HUMIDITY → LIGHT → MOTION → TEMPERATURE) or
+  counterclockwise (the reverse order). Click the knob to press its button.
+
+**Keep the system ACTIVE while testing.** After 15 s without motion the
+system goes INACTIVE. The OLED goes blank, sampling stops and the encoder is
+ignored; the PIR is still monitored, and the heartbeat LED keeps toggling.
+Trigger the PIR to wake it. Step-by-step functional tests and fault
+experiments, with recorded results, are in
+[`docs/test-plan.md`](docs/test-plan.md).
 
 The FreeRTOS scheduler runs correctly in Wokwi under the project's custom
-port. In the Wokwi terminal, all six tasks start, SensorTask logs a sample
-every 2 s, and StateTask switches the system to INACTIVE after 15 s without
-motion. Why a custom port is needed is covered under
+port. Why a custom port is needed is covered under
 [Engineering Decisions](#engineering-decisions).
 
 ## Unit Testing

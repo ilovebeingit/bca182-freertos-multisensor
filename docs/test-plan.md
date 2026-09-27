@@ -35,8 +35,10 @@ the expected behaviour, note it and add it to `docs/dev-log.md`.
    **F1 → "Wokwi: Start Simulator"**.
 2. Keep the **Wokwi Terminal** (the serial log) and the circuit diagram both
    visible.
-3. **Part controls:** click the DHT22, the photoresistor or the PIR to open
-   its controls (temperature/humidity sliders, light slider, motion trigger).
+3. **Part controls:** click the DHT22 or the photoresistor to open its
+   sliders (temperature/humidity, light). To **trigger the PIR**, click it and
+   then click **Simulate Motion** in the popup; its output stays high for 5 s
+   (Wokwi's default).
    The KY-040 encoder's arrows turn it clockwise (CW) or counterclockwise
    (CCW); clicking the knob presses its button.
 4. **Keep the system ACTIVE:** after 15 s without motion it goes INACTIVE
@@ -113,9 +115,8 @@ the expected behaviour, note it and add it to `docs/dev-log.md`.
 
 **Steps**
 1. Turn the encoder CW until the log shows `INPUT: mode MOTION`.
-2. Trigger the PIR.
-3. Wait for the PIR output to go low again (Wokwi holds it high for a few
-   seconds).
+2. Trigger the PIR (click it, then **Simulate Motion**).
+3. Wait for the PIR output to go low again (Wokwi holds it high for 5 s).
 
 **Expected**
 - On the trigger: `MOTION: detected`, and the OLED value shows `DETECTED`.
